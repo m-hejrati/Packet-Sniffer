@@ -1,14 +1,5 @@
-/*
-#include "iostream"
-
-int main(void)
-{
-    std::cout << "Hello! This is a C++ program.\n";
-    return 0;
-}
-*/
-
 #include <locale>
+#include <json-c/json.h>
 
 #include <pcap.h>
 #include <stdio.h>
@@ -27,9 +18,17 @@ int main(void)
 #include<signal.h>
 #include<unistd.h>
 
+
+// a class to save protocol feature
+class Protocol{
+
+public:
+	int tcpudp = 0;
+};
+
 // an struct to hold name and ip of packets
 struct device {
-	
+
 	char name [20];
 	char ip [16];
 };
@@ -365,6 +364,25 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 // separate useful part of udp packet
 void Processing_udp_packet(const u_char * Buffer, int Size){
 
+
+	// read config file
+	char buffer [1024];
+	FILE *fp;
+	fp = fopen ("config.json", "r");
+	fread (buffer,1024, 1, fp);
+	fclose (fp);
+
+	struct json_object *parsed_json;	
+	struct json_object *json_device;
+        struct json_object *json_number;
+
+        parsed_json = json_tokener_parse(buffer);
+
+        json_object_object_get_ex (parsed_json, "json_device", &json_device);
+        json_object_object_get_ex (parsed_json, "json_number", &json_number);
+
+
+
 	unsigned short iphdrlen;
 	
 	struct iphdr *iph = (struct iphdr *)(Buffer +  sizeof(struct ethhdr));
@@ -400,28 +418,94 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body)
 {
 
-	int size = packet_header->len;
-	
-	//Get the IP Header part of this packet , excluding the ethernet header
-	struct iphdr *iph = (struct iphdr*)(packet_body + sizeof(struct ethhdr));
+  	// read config file
+        char buffer [512];
+        FILE *fp;
+        fp = fopen ("config.json", "r");
+        fread (buffer, 512, 1, fp);
+        fclose (fp);
 
-	switch (iph->protocol) //Check the Protocol and do accordingly...
-	{
-		case 6:  //TCP Protocol
-			Processing_tcp_packet(packet_body , size);
-			break;
+        struct json_object *parsed_json;
+        struct json_object *json_tcp;
+        struct json_object *json_udp;
+
+        parsed_json = json_tokener_parse(buffer);
+
+        json_object_object_get_ex (parsed_json, "json_tcp", &json_tcp);
+        json_object_object_get_ex (parsed_json, "json_udp", &json_udp);
+
+        char tcp_add [10];
+        strcpy (tcp_add, json_object_get_string(json_tcp));
+        char udp_add [10];
+        strcpy (udp_add, json_object_get_string(json_udp));
+
+	// crate object from classes
+	Protocol tcp;
+	Protocol udp;
+
+	// fill classes with data of config files if they are enable
+	if (strcmp(tcp_add, "disable") != 0){
 		
-		case 17: //UDP Protocol
-			Processing_udp_packet(packet_body , size);
-			break;
-		
-		default: //Other Protocol
-			return;
+		// read this protocol config file
+		char buffer [512];
+		FILE *fp;
+		fp = fopen (tcp_add, "r");
+		fread (buffer, 512, 1, fp);
+		fclose (fp);
+
+		struct json_object *parsed_json;
+		struct json_object *json_tcpudp;
+
+		parsed_json = json_tokener_parse(buffer);
+		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
+
+		tcp.tcpudp = json_object_get_int(json_tcpudp);
 	}
+	if (strcmp(udp_add, "disable") != 0){
+		
+		// read this protocol config file
+		char buffer [512];
+		FILE *fp;
+		fp = fopen (udp_add, "r");
+		fread (buffer, 512, 1, fp);
+		fclose (fp);
+
+		struct json_object *parsed_json;
+		struct json_object *json_tcpudp;
+
+		parsed_json = json_tokener_parse(buffer);
+		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
+
+		udp.tcpudp = json_object_get_int(json_tcpudp);
+
+	}
+
+
+    // Pointers to start point of header.
+    const u_char *ip_header;
+
+    // Header lengths in bytes
+    int ethernet_header_length = 14; // Doesn't change
+
+    //start of IP header
+    ip_header = packet_body + ethernet_header_length;
+
+    //Protocol is always the 10th byte of the IP header
+    u_char protocol = *(ip_header + 9);
+
+	int size = packet_header->len;
+
+    	if ((protocol == 6) && (tcp.tcpudp == 6))  //TCP Protocol
+		Processing_tcp_packet(packet_body , size);
+    
+	else if ((protocol == 17) && udp.tcpudp == 17) //UDP Protocol
+		Processing_udp_packet(packet_body , size);
+	else
+		return;
 }
 
 // show all available device and choose one of them to sniff
-struct device select_device(){
+struct device select_device(int device_num){
 
     pcap_if_t *alldevsp , *device;
     //char devs[100][100];
@@ -460,14 +544,13 @@ struct device select_device(){
         count++;
     }
      
-    //ask user to select a device to sniff
-    printf("\nEnter the number of device you want to sniff : ");
-    scanf("%d" , &n);
+
+    printf("\nNumber of device you want to sniff : %d", device_num);
 
 	// copy and return selected device
 	struct device selected_device;
-	strcpy(selected_device.name, devices[n].name);
-	strcpy(selected_device.ip, devices[n].ip);
+	strcpy(selected_device.name, devices[device_num].name);
+	strcpy(selected_device.ip, devices[device_num].ip);
 
     return selected_device;
 
@@ -595,15 +678,37 @@ int main() {
 	char addres_class; // ip address class between A, B, C, ...
 	struct pcap_pkthdr header; //header that pcap gives us
 	const u_char *packet; // actual packet
-	int num_packets; // number of packets to capture 
 	
 	reset_protocols();
 
 	// open logging machine
 	openlog("p2-advanced | sniffer", LOG_PID, LOG_USER);
 
+
+	// read config file
+	char buffer [512];
+	FILE *fp;
+	fp = fopen ("config.json", "r");
+	fread (buffer, 512, 1, fp);
+	fclose (fp);
+
+	struct json_object *parsed_json;	
+	struct json_object *json_device;
+        struct json_object *json_number;
+
+        parsed_json = json_tokener_parse(buffer);
+
+        json_object_object_get_ex (parsed_json, "json_device", &json_device);
+        json_object_object_get_ex (parsed_json, "json_number", &json_number);
+
+	int device_num; // device number to capture
+       	device_num = json_object_get_int(json_device);
+	int num_packets; // number of packets to capture 
+        num_packets = json_object_get_int(json_number);
+
+
 	// select device
-	device = select_device();
+	device = select_device(device_num);
 
 	// ask pcap for the network address and mask of the device
     if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1){
@@ -624,10 +729,9 @@ int main() {
 	printf("IP: %s\n", device.ip);
 	printf("Mask: %s\n" , mask);
 	printf("Class: %c\n", addres_class);
-	
-    printf("\nEnter number of packets you want to capture: ");
-    scanf("%d" , &num_packets);
-    
+	  
+	printf("\nNumber of packets you want to capture: %d", num_packets);
+
 	// open device in promiscuous mode
     handle = pcap_open_live(device.name, BUFSIZ, 1, 0, error_buffer);
     if (handle == NULL) {
@@ -655,7 +759,7 @@ int main() {
     syslog(LOG_INFO, "Start sniffing on device: %s and %d packets", device.name, num_packets);
 
 	while (1) {
-			
+
 		signal(SIGALRM, sig_handler);
 		alarm(30);
 
@@ -671,4 +775,5 @@ int main() {
 
     closelog();
     return 0;
-}																																																									
+}
+

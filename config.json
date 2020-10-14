@@ -1,0 +1,9 @@
+{
+	"json_device" : 3,
+	"json_number" : 10,
+	"log" : "No",
+	"json_tcp" : "tcp.json",
+	"json_udp" : "disable",
+	"dns" : "disable",
+	"http" : "disable"
+}
