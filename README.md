@@ -13,10 +13,16 @@ config files written in json format, we use json-c library to parse them:
 sudo apt install libjson-c-dev
 ```
 
-for compiling C++ program we should add -lpcap and -ljson-c:
+for logging, we use spdlog library, download it from git:
 ```bash
-g++ sniffer.cpp -o sniffer.out -lpcap -ljson-c
+git clone https://github.com/gabime/spdlog.git
+```
+
+for compiling C++ program we should add -lpcap and -ljson-c and directory name of spdlog library:
+```bash
+g++ sniffer.cpp -o sniffer.out -lpcap -ljson-c -I "spdlog/include"
 ````
+
 and it needs to run with sudo:
 ```bash
 sudo ./sniffer.out
