@@ -1,7 +1,7 @@
 {
-	"json_device" : 3,
+	"json_device" : 1,
 	"json_number" : 10,
-	"log" : "No",
+	"json_log" : 2,
 	"json_tcp" : "tcp.json",
 	"json_udp" : "disable",
 	"dns" : "disable",

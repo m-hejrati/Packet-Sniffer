@@ -1,5 +1,10 @@
 #include <locale>
 #include <json-c/json.h>
+#include "spdlog/spdlog.h"
+#include <string>
+
+using namespace std;
+
 
 #include <pcap.h>
 #include <stdio.h>
@@ -19,12 +24,61 @@
 #include<unistd.h>
 
 
-// a class to save protocol feature
-class Protocol{
+// this class save protocol feature
+class Protocol {
 
 public:
 	int tcpudp = 0;
 };
+
+// this class log important event of the program
+class Logger {
+
+public:	
+
+	int type;
+	string greeting = "Hello";
+
+	// constructor of Logger class
+	Logger(int typ){
+		type = typ;
+	}
+	
+	// get message and log with choose level
+    void log(string message){
+
+	    switch (type) {
+			case 1:
+				spdlog::debug(message);
+				break;			
+
+			case 2:
+				spdlog::info(message);
+				break;
+			case 3:
+
+				spdlog::warn(message);
+				break;
+			case 4:
+
+				spdlog::error(message);
+				break;
+
+			case 5:
+				spdlog::critical(message);
+				break;
+
+			case 0:
+			default:
+				// do nothing
+				break;
+		}
+    }
+};
+
+// create global logger object to use it all over the program
+Logger logger(0);
+
 
 // an struct to hold name and ip of packets
 struct device {
@@ -272,9 +326,13 @@ char* find_printable_payload(const u_char *payload, int len){
 // print useful data of ip header
 void print_ip_header(int Size, struct IP ip) {
 	
-    syslog(LOG_INFO, "Packet size: %d bytes\n", Size);
-	syslog(LOG_INFO, "     Src IP: %s\n", ip.src);
-	syslog(LOG_INFO, "     Dst IP: %s\n", ip.dst);
+	char buff [50];
+    sprintf(buff, "Packet size: %d bytes", Size);
+	logger.log(buff);
+    sprintf(buff, "     Src IP: %s", ip.src);
+	logger.log(buff);
+    sprintf(buff, "     Dst IP: %s", ip.dst);
+	logger.log(buff);
 }
 
 // separate useful part of ip header
@@ -304,21 +362,26 @@ struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 // print useful data of tcp header
 void print_tcp_header(const u_char * Buffer, int Size, struct tcphdr *tcph) {
 
-    syslog(LOG_INFO, "   Src port: %d\n", ntohs(tcph->source));
-	syslog(LOG_INFO, "   Dst port: %d\n", ntohs(tcph->dest));
-	
+	char buff [50];
+    sprintf(buff, "   Src port: %d", ntohs(tcph->source));
+	logger.log(buff);
+    sprintf(buff, "   Dst port: %d", ntohs(tcph->dest));
+	logger.log(buff);
 }
 
 // print useful data of udp header
 void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
 
-    syslog(LOG_INFO, "   Src port: %d\n", ntohs(udph->source));
-	syslog(LOG_INFO, "   Dst port: %d\n", ntohs(udph->dest));
+	char buff [50];
+    sprintf(buff, "   Src port: %d", ntohs(udph->source));
+	logger.log(buff);
+    sprintf(buff, "   Dst port: %d", ntohs(udph->dest));
+	logger.log(buff);
 	
 	if ( (ntohs(udph->source) == 53) || (ntohs(udph->dest) == 53))
-		syslog(LOG_INFO, "        DNS: Yes\n");
+		logger.log("        DNS: Yes");
 	else
-		syslog(LOG_INFO, "        DNS: No\n");	
+		logger.log("        DNS: No");	
 }
 
 // separate useful part of tcp packet
@@ -340,22 +403,24 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 
-	syslog(LOG_INFO, " ");
+	logger.log(" ");
 	packet_number ++;
-	syslog(LOG_INFO, "     number: %d", packet_number);
-	syslog(LOG_INFO, "   Protocol: TCP\n");
+	char buff [50];
+    sprintf(buff, "     number: %d", packet_number);
+	logger.log(buff);
+    sprintf(buff, "   Protocol: TCP");
+	logger.log(buff);
 	
 	print_ip_header(Size, ip);
     	print_tcp_header(Buffer, Size, tcph);
 
 	if (strstr(printable_payload, "HTTP") != NULL)
-		syslog(LOG_INFO, "       HTTP: Yes\n");
+		logger.log("       HTTP: Yes");
 	else 
-		syslog(LOG_INFO, "       HTTP: No\n");
+		logger.log("       HTTP: No");
 
-	syslog(LOG_INFO, "    payload: %s", printable_payload);
-
-	printf("%d) TCP packet logged\n", packet_number);
+    //sprintf(buff, "    payload: %s", printable_payload);
+	//logger.log(buff);
 
 	save_session("tcp", ip, ntohs(tcph->source), ntohs(tcph->dest), Size, (int)tcph->fin);
 	save_protocol(ntohs(tcph->source), ntohs(tcph->dest));
@@ -398,16 +463,19 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 
-	syslog(LOG_INFO, " ");
+	logger.log(" ");
 	packet_number ++;
-	syslog(LOG_INFO, "     number: %d", packet_number);
-	syslog(LOG_INFO, "   Protocol: UDP\n");
+	char buff [50];
+    sprintf(buff, "     number: %d", packet_number);
+	logger.log(buff);
+    sprintf(buff, "   Protocol: UDP");
+	logger.log(buff);
 	
 	print_ip_header(Size, ip);
 	print_udp_header(Buffer , Size, udph);
-	syslog(LOG_INFO, "    payload: %s", printable_payload);
 
-	printf("%d) UDP packet logged\n", packet_number);
+    //sprintf(buff, "    payload: %s", printable_payload);
+	//logger.log(buff);
 
 	save_session("udp", ip, ntohs(udph->source), ntohs(udph->dest), Size, 0);
 	save_protocol(ntohs(udph->source), ntohs(udph->dest));
@@ -518,8 +586,8 @@ struct device select_device(int device_num){
     printf("Finding available devices ... ");
     if( pcap_findalldevs( &alldevsp , errbuf) )
     {
-        printf("Error finding devices : %s" , errbuf);
-		syslog(LOG_ERR, "Error finding devices : %s" , errbuf);
+        //printf("Error finding devices : %s" , errbuf);
+		logger.log("Error finding devices");
         exit(1);
     }
     printf("Done");
@@ -679,10 +747,8 @@ int main() {
 	struct pcap_pkthdr header; //header that pcap gives us
 	const u_char *packet; // actual packet
 	
+	
 	reset_protocols();
-
-	// open logging machine
-	openlog("p2-advanced | sniffer", LOG_PID, LOG_USER);
 
 
 	// read config file
@@ -692,19 +758,27 @@ int main() {
 	fread (buffer, 512, 1, fp);
 	fclose (fp);
 
+	// declare struct to read json
 	struct json_object *parsed_json;	
 	struct json_object *json_device;
-        struct json_object *json_number;
+    struct json_object *json_number;
+	struct json_object *json_log;
 
-        parsed_json = json_tokener_parse(buffer);
+    parsed_json = json_tokener_parse(buffer);
 
-        json_object_object_get_ex (parsed_json, "json_device", &json_device);
-        json_object_object_get_ex (parsed_json, "json_number", &json_number);
+  	json_object_object_get_ex (parsed_json, "json_device", &json_device);
+    json_object_object_get_ex (parsed_json, "json_number", &json_number);
+    json_object_object_get_ex (parsed_json, "json_log", &json_log);
 
 	int device_num; // device number to capture
        	device_num = json_object_get_int(json_device);
 	int num_packets; // number of packets to capture 
         num_packets = json_object_get_int(json_number);
+	int log_type; // log level
+		log_type = json_object_get_int(json_log);
+
+	// set log level
+	logger.type = log_type;
 
 
 	// select device
@@ -713,8 +787,8 @@ int main() {
 	// ask pcap for the network address and mask of the device
     if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1){
 
-        printf("Couldn't read device %s information - %s\n", device.name, error_buffer);
-		syslog(LOG_ERR, "Couldn't read device %s information - %s\n", device.name, error_buffer);
+        //printf("Couldn't read device %s information - %s\n", device.name, error_buffer);
+		logger.log("Couldn't read selected device information");
     }
 	
 	// get the subnet mask in a human readable form
@@ -735,28 +809,27 @@ int main() {
 	// open device in promiscuous mode
     handle = pcap_open_live(device.name, BUFSIZ, 1, 0, error_buffer);
     if (handle == NULL) {
-        printf("Couldn't open device %s - %s\n", device.name, error_buffer);
-		syslog(LOG_ERR, "Couldn't open device %s - %s\n", device.name, error_buffer);
+        //printf("Couldn't open device %s - %s\n", device.name, error_buffer);
+		logger.log("Couldn't open selected device");
         return 1;
 	}
 
 	// compile the filter expression
     if (pcap_compile(handle, &filter, filter_exp, 0, ip) == -1) {
-        printf("Bad filter - %s\n", pcap_geterr(handle));
-		syslog(LOG_ERR, "Bad filter - %s\n", pcap_geterr(handle));
+        //printf("Bad filter - %s\n", pcap_geterr(handle));
+		logger.log("Bad filter");
         return 1;
     }
 	// apply the compiled filter
     if (pcap_setfilter(handle, &filter) == -1) {
-        printf("Error setting filter - %s\n", pcap_geterr(handle));
-		syslog(LOG_ERR, "Error setting filter - %s\n", pcap_geterr(handle));
+        //printf("Error setting filter - %s\n", pcap_geterr(handle));
+		logger.log("Error setting filter");
         return 1;
     }
 
 	// print capture info
 	printf("\nStart sniffing...\n\n");
 	printf("Number of packets: %d\n\n", num_packets);
-    syslog(LOG_INFO, "Start sniffing on device: %s and %d packets", device.name, num_packets);
 
 	while (1) {
 
