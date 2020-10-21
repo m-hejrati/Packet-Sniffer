@@ -27,9 +27,10 @@ using namespace std;
 // this class save protocol feature
 class Protocol {
 
-public:
+private:
 	int tcpudp = 0;
 
+public:
 	// setter
     void setTcpudp(int tu) {
       tcpudp = tu;
@@ -44,10 +45,10 @@ public:
 // this class log important event of the program
 class Logger {
 
-public:	
-
+private:
 	int type;
 
+public:
 	// setter
     void setType(int t) {
       type = t;
