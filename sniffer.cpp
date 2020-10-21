@@ -29,6 +29,16 @@ class Protocol {
 
 public:
 	int tcpudp = 0;
+
+	// setter
+    void setTcpudp(int tu) {
+      tcpudp = tu;
+    }
+
+    // getter
+    int getTcpudp() {
+      return tcpudp;
+    } 
 };
 
 // this class log important event of the program
@@ -37,7 +47,16 @@ class Logger {
 public:	
 
 	int type;
-	string greeting = "Hello";
+
+	// setter
+    void setType(int t) {
+      type = t;
+    }
+
+    // getter
+    int getType() {
+      return type;
+    } 
 
 	// constructor of Logger class
 	Logger(int typ){
@@ -94,208 +113,6 @@ struct IP {
 	char dst [16];
 };
 
-// number of captured packets
-int packet_number = 0;
-
-// an struct to save information of each session
-struct session_info {
-	int No;
-	char type [4];
-	char src_IP[16];
-	char dst_IP[16];
-	long scr_port;
-	long dst_port;
-	int num_req;
-	int num_rsp;
-	long len;
-	int status;
-};
-
-// an array of session_info structure
-struct session_info session[1000];
-int z = 0;
-
-// an struct save number of each protocol 
-struct packet_protocol {
-
-	int FTP_DATA;
-	int FTP;
-	int SSH;
-	int TELNET;
-	int SMTP;
-	int DNS;
-	int TFTP;
-	int HTTP;
-	int POP3;
-	int NNTP;
-	int NTP;
-	int IMAP4;
-	int HTTPS;
-	int Others;
-
-};
-
-struct packet_protocol protocols;
-
-// set number of different protocol to zero
-void reset_protocols (){
-
-	protocols.FTP_DATA = 0;
-	protocols.FTP = 0;
-	protocols.SSH = 0;
-	protocols.TELNET = 0;
-	protocols.SMTP = 0;
-	protocols.DNS = 0;
-	protocols.TFTP = 0;
-	protocols.HTTP = 0;
-	protocols.POP3 = 0;
-	protocols.NNTP = 0;
-	protocols.NTP = 0;
-	protocols.IMAP4 = 0;
-	protocols.HTTPS = 0;
-	protocols.Others = 0;
-
-}
-
-// add protocol of captured packet to list
-void save_protocol(int src_port, int dst_port){
-
-	switch (src_port) {
-		case 20:
-			protocols.FTP_DATA ++;
-			return;
-		case 21:
-			protocols.FTP ++;
-			return;
-		case 22:
-			protocols.SSH ++;
-			return;
-		case 23:
-			protocols.TELNET ++;
-			return;
-		case 25:
-			protocols.SMTP ++;
-			return;
-		case 53:
-			protocols.DNS ++;
-			return;
-		case 69:
-			protocols.TFTP ++;
-			return;
-		case 80:
-			protocols.HTTP ++;
-			return;
-		case 110:
-			protocols.POP3 ++;
-			return;
-		case 119:
-			protocols.NNTP ++;
-			return;
-		case 123:
-			protocols.NTP ++;
-			return;
-		case 143:
-			protocols.IMAP4 ++;
-			return;
-		case 443:
-			protocols.HTTPS ++;
-			return;
-		default:
-			// pass			
-			break;
-	}
-	
-	switch (dst_port) {
-		case 20:
-			protocols.FTP_DATA ++;
-			return;
-		case 21:
-			protocols.FTP ++;
-			return;
-		case 22:
-			protocols.SSH ++;
-			return;
-		case 23:
-			protocols.TELNET ++;
-			return;
-		case 25:
-			protocols.SMTP ++;
-			return;
-		case 53:
-			protocols.DNS ++;
-			return;
-		case 69:
-			protocols.TFTP ++;
-			return;
-		case 80:
-			protocols.HTTP ++;
-			return;
-		case 110:
-			protocols.POP3 ++;
-			return;
-		case 119:
-			protocols.NNTP ++;
-			return;
-		case 123:
-			protocols.NTP ++;
-			return;
-		case 143:
-			protocols.IMAP4 ++;
-			return;
-		case 443:
-			protocols.HTTPS ++;
-			return;
-		default:
-			protocols.Others ++;			
-			return;
-	}
-}
-
-// save session information
-void save_session(char type[], struct IP ip, int src_port, int dst_port, int Size, int fin){
-
-	int flag = 1;
-
-	for (int i = 0; i < z; i++){
-		
-		if (strcmp(session[i].type, type) == 0)
-
-			if ( (strcmp(session[i].src_IP, ip.src) == 0) && (strcmp(session[i].dst_IP, ip.dst) == 0) && (session[i].scr_port == src_port) && (session[i].dst_port == dst_port) ){
-				
-				session[i].num_req ++;
-				session[i].len += Size;
-				flag = 0;
-				session[i].status = fin;
-				break;
-
-			} else if ( (strcmp(session[i].src_IP, ip.dst) == 0) && (strcmp(session[i].dst_IP, ip.src) == 0) && (session[i].scr_port == dst_port) && (session[i].dst_port == src_port) ){
-
-				session[i].num_rsp ++;
-				session[i].len += Size;
-				flag = 0;
-				session[i].status = fin;
-				break;
-
-			}
-	}
-
-	// if there is not any similiar session
-	if (flag){
-		
-		session[z].No = z+1;
-		strcpy(session[z].type, type);
-		strcpy(session[z].src_IP, ip.src);
-		strcpy(session[z].dst_IP, ip.dst);
-		session[z].scr_port = src_port;
-		session[z].dst_port = dst_port;
-		session[z].num_req = 1;
-		session[z].num_rsp = 0;
-		session[z].len = Size;
-		session[z].status = fin;
-		z++;
-	}
-
-}
 
 // find and save prinatble part of payload
 char* find_printable_payload(const u_char *payload, int len){
@@ -439,13 +256,12 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
 	struct json_object *parsed_json;	
 	struct json_object *json_device;
-        struct json_object *json_number;
+    struct json_object *json_number;
 
-        parsed_json = json_tokener_parse(buffer);
+    parsed_json = json_tokener_parse(buffer);
 
-        json_object_object_get_ex (parsed_json, "json_device", &json_device);
-        json_object_object_get_ex (parsed_json, "json_number", &json_number);
-
+    json_object_object_get_ex (parsed_json, "json_device", &json_device);
+    json_object_object_get_ex (parsed_json, "json_number", &json_number);
 
 
 	unsigned short iphdrlen;
@@ -527,7 +343,7 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		parsed_json = json_tokener_parse(buffer);
 		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
 
-		tcp.tcpudp = json_object_get_int(json_tcpudp);
+		tcp.setTcpudp (json_object_get_int(json_tcpudp));
 	}
 	if (strcmp(udp_add, "disable") != 0){
 		
@@ -544,7 +360,7 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		parsed_json = json_tokener_parse(buffer);
 		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
 
-		udp.tcpudp = json_object_get_int(json_tcpudp);
+		udp.setTcpudp (json_object_get_int(json_tcpudp));
 
 	}
 
@@ -563,10 +379,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 	int size = packet_header->len;
 
-    	if ((protocol == 6) && (tcp.tcpudp == 6))  //TCP Protocol
+    	if ((protocol == 6) && (tcp.getTcpudp == 6))  //TCP Protocol
 		Processing_tcp_packet(packet_body , size);
     
-	else if ((protocol == 17) && udp.tcpudp == 17) //UDP Protocol
+	else if ((protocol == 17) && udp.getTcpudp == 17) //UDP Protocol
 		Processing_udp_packet(packet_body , size);
 	else
 		return;
@@ -647,84 +463,8 @@ char addres_class_detection(char ip_reference [20]){
 		 return 'D';		 
 	else if (240 <= class_add && class_add <= 247)
 		 return 'E';	 
- }
-
-// define handle global, to use it in sig_handler function
-pcap_t *handle;
-
-// write a flag to save number of each protocol every minutes instead of 30 second.
-int one_minute_flag = 0;
-
-// run this function after 30 second of capturing
-void sig_handler(int signum){
-
-	pcap_breakloop(handle);
-
-	if (z != 0){
-
-		printf("%d packet in %d session recorded in last 30 seconds \n", packet_number, z);
-		syslog(LOG_INFO, " ");
-		syslog(LOG_INFO, "%d session recorded in last 30 seconds \n", z);
-
-		for(int i = 0; i < z; i++){
-
-			syslog(LOG_INFO, " ");
-			syslog(LOG_INFO, "Session No: %d", i+1);
-			syslog(LOG_INFO, "  Protocol: %s", session[i].type);
-			syslog(LOG_INFO, "    Src IP: %s", session[i].src_IP);
-			syslog(LOG_INFO, "    Dst IP: %s", session[i].dst_IP);
-			syslog(LOG_INFO, "  Src port: %ld", session[i].scr_port);
-			syslog(LOG_INFO, "  Dst port: %ld", session[i].dst_port);
-			syslog(LOG_INFO, "      Sent: %d", session[i].num_req);
-			syslog(LOG_INFO, "  Received: %d", session[i].num_rsp);
-			syslog(LOG_INFO, "Total Size: %ld", session[i].len);
-			if (strcmp(session[i].type, "tcp") == 0)
-				if(session[i].status)
-					syslog(LOG_INFO, "    Status: close");
-				else 
-					syslog(LOG_INFO, "    Status: open");
-		}
-	
-		z = 0;
-		packet_number = 0;		
-
-	}else{
-		syslog(LOG_INFO, " ");
-		syslog(LOG_INFO, "No packet captured in last 30 seconds \n");
-		printf("No packet captured in last 30 seconds \n");	
-	}
-
-	// save number of each protocol every minutes
-	if (one_minute_flag){
-
-	syslog(LOG_DEBUG, "\n");
-	syslog(LOG_DEBUG, "Number of packets from each type of protocol in last one minute:\n");
-	
-	syslog(LOG_DEBUG, "  FTP_DATA: %d\n", protocols.FTP_DATA);
-	syslog(LOG_DEBUG, "       FTP: %d\n", protocols.FTP);
-	syslog(LOG_DEBUG, "       SSH: %d\n", protocols.SSH);
-	syslog(LOG_DEBUG, "    TELNET: %d\n", protocols.TELNET);
-	syslog(LOG_DEBUG, "      SMTP: %d\n", protocols.SMTP);
-	syslog(LOG_DEBUG, "       DNS: %d\n", protocols.DNS);
-	syslog(LOG_DEBUG, "      TFTP: %d\n", protocols.TFTP);
-	syslog(LOG_DEBUG, "      HTTP: %d\n", protocols.HTTP);
-	syslog(LOG_DEBUG, "      POP3: %d\n", protocols.POP3);
-	syslog(LOG_DEBUG, "      NNTP: %d\n", protocols.NNTP);
-	syslog(LOG_DEBUG, "       NTP: %d\n", protocols.NTP);
-	syslog(LOG_DEBUG, "     IMAP4: %d\n", protocols.IMAP4);
-	syslog(LOG_DEBUG, "     HTTPS: %d\n", protocols.HTTPS);
-	syslog(LOG_DEBUG, "    Others: %d\n", protocols.Others);
-	printf("protocols in last one minute logged \n");
-
-	reset_protocols();
-
-	one_minute_flag = 0;
-
-	}else{
-		one_minute_flag = 1;	
-	}
-
 }
+
 
 // the main function
 int main() {
@@ -733,7 +473,7 @@ int main() {
 	printf("Mahdi Hejrati\n\n");
 
     struct device device; // device to sniff on
-    //pcap_t *handle; // session handle
+    pcap_t *handle; // session handle
     char error_buffer[PCAP_ERRBUF_SIZE]; // error string
 	// filter expression (second part of the following expression means to filter packet with body)
     //char filter_exp[] = "((tcp port 8765) or (udp port 53))and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)";
@@ -747,9 +487,6 @@ int main() {
 	struct pcap_pkthdr header; //header that pcap gives us
 	const u_char *packet; // actual packet
 	
-	
-	reset_protocols();
-
 
 	// read config file
 	char buffer [512];
@@ -778,7 +515,7 @@ int main() {
 		log_type = json_object_get_int(json_log);
 
 	// set log level
-	logger.type = log_type;
+	logger.setType(log_type);
 
 
 	// select device
@@ -809,20 +546,17 @@ int main() {
 	// open device in promiscuous mode
     handle = pcap_open_live(device.name, BUFSIZ, 1, 0, error_buffer);
     if (handle == NULL) {
-        //printf("Couldn't open device %s - %s\n", device.name, error_buffer);
 		logger.log("Couldn't open selected device");
         return 1;
 	}
 
 	// compile the filter expression
     if (pcap_compile(handle, &filter, filter_exp, 0, ip) == -1) {
-        //printf("Bad filter - %s\n", pcap_geterr(handle));
 		logger.log("Bad filter");
         return 1;
     }
 	// apply the compiled filter
     if (pcap_setfilter(handle, &filter) == -1) {
-        //printf("Error setting filter - %s\n", pcap_geterr(handle));
 		logger.log("Error setting filter");
         return 1;
     }
@@ -831,15 +565,9 @@ int main() {
 	printf("\nStart sniffing...\n\n");
 	printf("Number of packets: %d\n\n", num_packets);
 
-	while (1) {
 
-		signal(SIGALRM, sig_handler);
-		alarm(30);
-
-		// start sniffing
-		pcap_loop(handle, num_packets, packet_handler, NULL);
-
-	}
+	// start sniffing
+	pcap_loop(handle, num_packets, packet_handler, NULL);
 
 	// cleanup 
 	pcap_freecode(&filter);
@@ -849,4 +577,3 @@ int main() {
     closelog();
     return 0;
 }
-
