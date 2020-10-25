@@ -46,59 +46,58 @@ public:
 class Logger {
 
 private:
-	int type;
+	string type;
 
 public:
 	// setter
-    void setType(int t) {
+    void setType(string t) {
       type = t;
     }
 
     // getter
-    int getType() {
+    string getType() {
       return type;
     } 
 
 	// constructor of Logger class
-	Logger(int typ){
+	Logger(string typ){
 		type = typ;
 	}
 	
 	// get message and log with choose level
     void log(string message){
 
-	    switch (type) {
-			case 1:
-				spdlog::debug(message);
-				break;			
+	    if (type == "debug")
 
-			case 2:
-				spdlog::info(message);
-				break;
-			case 3:
+			spdlog::debug(message);					
 
-				spdlog::warn(message);
-				break;
-			case 4:
+		else if (type == "info")
 
-				spdlog::error(message);
-				break;
+			spdlog::info(message);
+	
+		else if (type == "warn")
 
-			case 5:
-				spdlog::critical(message);
-				break;
+			spdlog::warn(message);
+			
+		else if (type == "warn")
 
-			case 0:
-			default:
-				// do nothing
-				break;
-		}
-    }
+			spdlog::error(message);
+
+		else if (type == "critical")
+		
+			spdlog::critical(message);
+	}
+
 };
 
 // create global logger object to use it all over the program
-Logger logger(0);
+Logger logger("0");
 
+
+// number of captured packets
+int packet_number = 0;
+int tcp_number = 0;
+int udp_number = 0;
 
 // an struct to hold name and ip of packets
 struct device {
@@ -223,6 +222,7 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 
 	logger.log(" ");
 	packet_number ++;
+	tcp_number ++;
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
@@ -239,9 +239,6 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 
     //sprintf(buff, "    payload: %s", printable_payload);
 	//logger.log(buff);
-
-	save_session("tcp", ip, ntohs(tcph->source), ntohs(tcph->dest), Size, (int)tcph->fin);
-	save_protocol(ntohs(tcph->source), ntohs(tcph->dest));
 }
 
 // separate useful part of udp packet
@@ -282,6 +279,7 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
 	logger.log(" ");
 	packet_number ++;
+	udp_number ++;
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
@@ -293,10 +291,6 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
     //sprintf(buff, "    payload: %s", printable_payload);
 	//logger.log(buff);
-
-	save_session("udp", ip, ntohs(udph->source), ntohs(udph->dest), Size, 0);
-	save_protocol(ntohs(udph->source), ntohs(udph->dest));
-
 }
 
 // the major part of the program that gets a packet and extract important data of it
@@ -380,10 +374,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 	int size = packet_header->len;
 
-    	if ((protocol == 6) && (tcp.getTcpudp == 6))  //TCP Protocol
+    	if ((protocol == 6) && (tcp.getTcpudp() == 6))  //TCP Protocol
 		Processing_tcp_packet(packet_body , size);
     
-	else if ((protocol == 17) && udp.getTcpudp == 17) //UDP Protocol
+	else if ((protocol == 17) && udp.getTcpudp() == 17) //UDP Protocol
 		Processing_udp_packet(packet_body , size);
 	else
 		return;
@@ -441,6 +435,7 @@ struct device select_device(int device_num){
 
  }
 
+
 // detect address class
 char addres_class_detection(char ip_reference [20]){
 
@@ -467,6 +462,32 @@ char addres_class_detection(char ip_reference [20]){
 }
 
 
+// define handle global, to use it in sig_handler function
+pcap_t *handle;
+
+// time of each period of capturing
+int capture_time;
+
+// run this function after an specific time of capturing
+void sig_handler(int signum){
+
+	pcap_breakloop(handle);
+
+	char buff [50];
+	logger.log(" ");
+    sprintf(buff, "number of packets in last %d seconds", capture_time);
+	logger.log(buff);
+    sprintf(buff, "        tcp: %d", tcp_number);
+	logger.log(buff);
+	sprintf(buff, "        udp: %d", udp_number);
+	logger.log(buff);
+
+	tcp_number = 0;
+	udp_number = 0;
+	packet_number = 0;
+}
+
+
 // the main function
 int main() {
 
@@ -474,7 +495,7 @@ int main() {
 	printf("Mahdi Hejrati\n\n");
 
     struct device device; // device to sniff on
-    pcap_t *handle; // session handle
+    //pcap_t *handle; // session handle
     char error_buffer[PCAP_ERRBUF_SIZE]; // error string
 	// filter expression (second part of the following expression means to filter packet with body)
     //char filter_exp[] = "((tcp port 8765) or (udp port 53))and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)";
@@ -500,20 +521,23 @@ int main() {
 	struct json_object *parsed_json;	
 	struct json_object *json_device;
     struct json_object *json_number;
+    struct json_object *json_time;
 	struct json_object *json_log;
 
     parsed_json = json_tokener_parse(buffer);
 
   	json_object_object_get_ex (parsed_json, "json_device", &json_device);
     json_object_object_get_ex (parsed_json, "json_number", &json_number);
+    json_object_object_get_ex (parsed_json, "json_time", &json_time);
     json_object_object_get_ex (parsed_json, "json_log", &json_log);
 
 	int device_num; // device number to capture
        	device_num = json_object_get_int(json_device);
 	int num_packets; // number of packets to capture 
         num_packets = json_object_get_int(json_number);
-	int log_type; // log level
-		log_type = json_object_get_int(json_log);
+   	capture_time = json_object_get_int(json_time);	
+	string log_type; // log level
+		log_type = json_object_get_string(json_log);
 
 	// set log level
 	logger.setType(log_type);
@@ -563,12 +587,21 @@ int main() {
     }
 
 	// print capture info
-	printf("\nStart sniffing...\n\n");
-	printf("Number of packets: %d\n\n", num_packets);
+	printf("\n\nStart sniffing...\n");
+	printf("period time: %d\n\n", capture_time);
 
 
-	// start sniffing
-	pcap_loop(handle, num_packets, packet_handler, NULL);
+	while (1) {
+		
+		// here we set an alarm for an specific time and then sig_handler function run
+		signal(SIGALRM, sig_handler);
+		alarm(capture_time);
+
+		// start sniffing
+		pcap_loop(handle, num_packets, packet_handler, NULL);
+
+	}
+
 
 	// cleanup 
 	pcap_freecode(&filter);
@@ -578,3 +611,4 @@ int main() {
     closelog();
     return 0;
 }
+

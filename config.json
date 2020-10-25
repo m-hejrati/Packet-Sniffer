@@ -1,9 +1,10 @@
 {
 	"json_device" : 1,
 	"json_number" : 10,
-	"json_log" : 2,
+	"json_time" : 10,
+	"json_log" : "warn",
 	"json_tcp" : "tcp.json",
-	"json_udp" : "disable",
+	"json_udp" : "udp.json",
 	"dns" : "disable",
 	"http" : "disable"
 }
