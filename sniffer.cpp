@@ -100,11 +100,6 @@ public:
 Logger logger(0);
 
 
-// number of captured packets
-int packet_number = 0;
-int tcp_number = 0;
-int udp_number = 0;
-
 // an struct to hold name and ip of packets
 struct device {
 
@@ -228,7 +223,6 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 
 	logger.log(" ");
 	packet_number ++;
-	tcp_number ++;
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
@@ -245,6 +239,9 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 
     //sprintf(buff, "    payload: %s", printable_payload);
 	//logger.log(buff);
+
+	save_session("tcp", ip, ntohs(tcph->source), ntohs(tcph->dest), Size, (int)tcph->fin);
+	save_protocol(ntohs(tcph->source), ntohs(tcph->dest));
 }
 
 // separate useful part of udp packet
@@ -285,7 +282,6 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
 	logger.log(" ");
 	packet_number ++;
-	udp_number ++;
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
@@ -297,6 +293,10 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
     //sprintf(buff, "    payload: %s", printable_payload);
 	//logger.log(buff);
+
+	save_session("udp", ip, ntohs(udph->source), ntohs(udph->dest), Size, 0);
+	save_protocol(ntohs(udph->source), ntohs(udph->dest));
+
 }
 
 // the major part of the program that gets a packet and extract important data of it
@@ -380,10 +380,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 	int size = packet_header->len;
 
-    	if ((protocol == 6) && (tcp.getTcpudp() == 6))  //TCP Protocol
+    	if ((protocol == 6) && (tcp.getTcpudp == 6))  //TCP Protocol
 		Processing_tcp_packet(packet_body , size);
     
-	else if ((protocol == 17) && udp.getTcpudp() == 17) //UDP Protocol
+	else if ((protocol == 17) && udp.getTcpudp == 17) //UDP Protocol
 		Processing_udp_packet(packet_body , size);
 	else
 		return;
@@ -441,7 +441,6 @@ struct device select_device(int device_num){
 
  }
 
-
 // detect address class
 char addres_class_detection(char ip_reference [20]){
 
@@ -468,24 +467,6 @@ char addres_class_detection(char ip_reference [20]){
 }
 
 
-// define handle global, to use it in sig_handler function
-pcap_t *handle;
-
-// run this function after 10 second of capturing
-void sig_handler(int signum){
-
-	pcap_breakloop(handle);
-
-	logger.log(" ");
-	logger.log("number of packets in last 10 seconds");
-	char buff [50];
-    sprintf(buff, "        tcp: %d", tcp_number);
-	logger.log(buff);
-	sprintf(buff, "        udp: %d", udp_number);
-	logger.log(buff);
-}
-
-
 // the main function
 int main() {
 
@@ -493,7 +474,7 @@ int main() {
 	printf("Mahdi Hejrati\n\n");
 
     struct device device; // device to sniff on
-    //pcap_t *handle; // session handle
+    pcap_t *handle; // session handle
     char error_buffer[PCAP_ERRBUF_SIZE]; // error string
 	// filter expression (second part of the following expression means to filter packet with body)
     //char filter_exp[] = "((tcp port 8765) or (udp port 53))and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)";
@@ -586,17 +567,8 @@ int main() {
 	printf("Number of packets: %d\n\n", num_packets);
 
 
-	while (1) {
-		
-		// here we set an alarm for 10 seconds and then sig_handler function run
-		signal(SIGALRM, sig_handler);
-		alarm(10);
-
-		// start sniffing
-		pcap_loop(handle, num_packets, packet_handler, NULL);
-
-	}
-
+	// start sniffing
+	pcap_loop(handle, num_packets, packet_handler, NULL);
 
 	// cleanup 
 	pcap_freecode(&filter);
@@ -606,4 +578,3 @@ int main() {
     closelog();
     return 0;
 }
-
