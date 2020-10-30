@@ -2,7 +2,7 @@
 	"json_device" : 1,
 	"json_number" : 10,
 	"json_time" : 10,
-	"json_log" : "info",
+	"json_log" : "debug",
 	"json_tcp" : "tcp.json",
 	"json_udp" : "udp.json",
 	"json_ipv4" : "ipv4.json",
