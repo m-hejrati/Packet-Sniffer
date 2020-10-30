@@ -2,9 +2,12 @@
 	"json_device" : 1,
 	"json_number" : 10,
 	"json_time" : 10,
-	"json_log" : "warn",
+	"json_log" : "info",
 	"json_tcp" : "tcp.json",
 	"json_udp" : "udp.json",
+	"json_ipv4" : "ipv4.json",
+	"json_ipv6" : "ipv6.json",
+	"json_arp" : "arp.json",
 	"dns" : "disable",
 	"http" : "disable"
 }

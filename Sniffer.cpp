@@ -28,18 +28,33 @@ using namespace std;
 class Protocol {
 
 private:
-	int tcpudp = 0;
+	int tcpudp_10 = -1;
+	int ip_13 = -1;
+	int ip_14 = -1;
 
 public:
 	// setter
-    void setTcpudp(int tu) {
-      tcpudp = tu;
+    void setTcpudp_10(int tu) {
+      tcpudp_10 = tu;
+    }
+    void setIp_13(int tu) {
+      ip_13 = tu;
+    }
+    void setIp_14(int tu) {
+      ip_14 = tu;
     }
 
     // getter
-    int getTcpudp() {
-      return tcpudp;
-    } 
+    int getTcpudp_10() {
+      return tcpudp_10;
+    }
+    int getIp_13() {
+      return ip_13;
+    }
+    int getIp_14() {
+      return ip_14;
+    }
+
 };
 
 // this class log important event of the program
@@ -98,6 +113,9 @@ Logger logger("0");
 int packet_number = 0;
 int tcp_number = 0;
 int udp_number = 0;
+int ipv4_number = 0;
+int ipv6_number = 0;
+int arp_number = 0;
 
 // an struct to hold name and ip of packets
 struct device {
@@ -202,7 +220,7 @@ void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
 }
 
 // separate useful part of tcp packet
-void Processing_tcp_packet(const u_char * Buffer, int Size) {
+void Processing_tcp_packet(const u_char * Buffer, int Size, char* ip_protocol) {
     
     unsigned short iphdrlen;
 	
@@ -226,6 +244,8 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
+    sprintf(buff, "   Protocol: %s", ip_protocol);
+	logger.log(buff);
     sprintf(buff, "   Protocol: TCP");
 	logger.log(buff);
 	
@@ -242,7 +262,7 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 }
 
 // separate useful part of udp packet
-void Processing_udp_packet(const u_char * Buffer, int Size){
+void Processing_udp_packet(const u_char * Buffer, int Size, char *ip_protocol){
 
 
 	// read config file
@@ -283,6 +303,8 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 	char buff [50];
     sprintf(buff, "     number: %d", packet_number);
 	logger.log(buff);
+    sprintf(buff, "   Protocol: %s", ip_protocol);
+	logger.log(buff);
     sprintf(buff, "   Protocol: UDP");
 	logger.log(buff);
 	
@@ -307,20 +329,35 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         struct json_object *parsed_json;
         struct json_object *json_tcp;
         struct json_object *json_udp;
+		struct json_object *json_ipv4;
+		struct json_object *json_ipv6;
+		struct json_object *json_arp;
 
         parsed_json = json_tokener_parse(buffer);
 
         json_object_object_get_ex (parsed_json, "json_tcp", &json_tcp);
         json_object_object_get_ex (parsed_json, "json_udp", &json_udp);
+		json_object_object_get_ex (parsed_json, "json_ipv4", &json_ipv4);
+        json_object_object_get_ex (parsed_json, "json_ipv6", &json_ipv6);
+        json_object_object_get_ex (parsed_json, "json_arp", &json_arp);
 
-        char tcp_add [10];
+        char tcp_add [15];
         strcpy (tcp_add, json_object_get_string(json_tcp));
-        char udp_add [10];
+        char udp_add [15];
         strcpy (udp_add, json_object_get_string(json_udp));
+		char ipv4_add [15];
+        strcpy (ipv4_add, json_object_get_string(json_ipv4));
+        char ipv6_add [15];
+        strcpy (ipv6_add, json_object_get_string(json_ipv6));
+		char arp_add [15];
+        strcpy (arp_add, json_object_get_string(json_arp));
 
 	// crate object from classes
 	Protocol tcp;
 	Protocol udp;
+	Protocol ipv4;
+	Protocol ipv6;
+	Protocol arp;
 
 	// fill classes with data of config files if they are enable
 	if (strcmp(tcp_add, "disable") != 0){
@@ -333,12 +370,12 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		fclose (fp);
 
 		struct json_object *parsed_json;
-		struct json_object *json_tcpudp;
+		struct json_object *json_tcpudp_10;
 
 		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
+		json_object_object_get_ex (parsed_json, "json_tcpudp_10", &json_tcpudp_10);
 
-		tcp.setTcpudp (json_object_get_int(json_tcpudp));
+		tcp.setTcpudp_10 (json_object_get_int(json_tcpudp_10));
 	}
 	if (strcmp(udp_add, "disable") != 0){
 		
@@ -350,15 +387,103 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		fclose (fp);
 
 		struct json_object *parsed_json;
-		struct json_object *json_tcpudp;
+		struct json_object *json_tcpudp_10;
 
 		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_tcpudp", &json_tcpudp);
+		json_object_object_get_ex (parsed_json, "json_tcpudp_10", &json_tcpudp_10);
 
-		udp.setTcpudp (json_object_get_int(json_tcpudp));
+		udp.setTcpudp_10 (json_object_get_int(json_tcpudp_10));
+
+	}
+	if (strcmp(ipv4_add, "disable") != 0){
+		
+		// read this protocol config file
+		char buffer [512];
+		FILE *fp;
+		fp = fopen (ipv4_add, "r");
+		fread (buffer, 512, 1, fp);
+		fclose (fp);
+
+		struct json_object *parsed_json;
+		struct json_object *json_ip_13;
+		struct json_object *json_ip_14;
+
+		parsed_json = json_tokener_parse(buffer);
+		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
+		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
+
+		ipv4.setIp_13 (json_object_get_int(json_ip_13));
+		ipv4.setIp_14 (json_object_get_int(json_ip_14));
+	}
+	if (strcmp(ipv6_add, "disable") != 0){
+		
+		// read this protocol config file
+		char buffer [512];
+		FILE *fp;
+		fp = fopen (ipv6_add, "r");
+		fread (buffer, 512, 1, fp);
+		fclose (fp);
+
+		struct json_object *parsed_json;
+		struct json_object *json_ip_13;
+		struct json_object *json_ip_14;
+
+		parsed_json = json_tokener_parse(buffer);
+		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
+		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
+
+		ipv6.setIp_13 (json_object_get_int(json_ip_13));
+		ipv6.setIp_14 (json_object_get_int(json_ip_14));
+
+	}
+	if (strcmp(arp_add, "disable") != 0){
+		
+		// read this protocol config file
+		char buffer [512];
+		FILE *fp;
+		fp = fopen (arp_add, "r");
+		fread (buffer, 512, 1, fp);
+		fclose (fp);
+
+		struct json_object *parsed_json;
+		struct json_object *json_ip_13;
+		struct json_object *json_ip_14;
+
+		parsed_json = json_tokener_parse(buffer);
+		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
+		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
+
+		arp.setIp_13 (json_object_get_int(json_ip_13));
+		arp.setIp_14 (json_object_get_int(json_ip_14));
 
 	}
 
+    u_char protocol_byte_13 = *(packet_body + 12);
+	u_char protocol_byte_14 = *(packet_body + 13);
+
+//	printf ("proto %d\t %d \n", protocol_byte_13, protocol_byte_14);	
+//	printf ("ipv4 %d\t %d \n", ipv4.getIp_13(), ipv4.getIp_14());	
+//	printf ("arp %d\t %d \n", arp.getIp_13(), arp.getIp_14());	
+
+	char ip_protocol [10];
+
+    if ((protocol_byte_13 == 8) && (ipv4.getIp_13() == 8) && (protocol_byte_14 == 0) && (ipv4.getIp_14() == 0)){  //ipv4 Protocol
+		strcpy (ip_protocol, "IPv4");
+		ipv4_number ++;
+		//printf("ipv4 cap\n"); 
+
+	}else if ((protocol_byte_13 == 134) && (ipv6.getIp_13() == 134) && (protocol_byte_14 == 221) && (ipv6.getIp_14() == 221)){  //ipv6 Protocol
+		strcpy (ip_protocol, "IPv6");
+		ipv6_number ++;		
+
+	}else if ((protocol_byte_13 == 8) && (arp.getIp_13() == 8) && (protocol_byte_14 == 6) && (arp.getIp_14() == 6)){  //arp Protocol
+		strcpy (ip_protocol, "ARP");
+		arp_number ++;
+		//printf("arp cap");	
+
+	}else{
+		return;
+	}
 
     // Pointers to start point of header.
     const u_char *ip_header;
@@ -374,11 +499,11 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 	int size = packet_header->len;
 
-    	if ((protocol == 6) && (tcp.getTcpudp() == 6))  //TCP Protocol
-		Processing_tcp_packet(packet_body , size);
+    if ((protocol == 6) && (tcp.getTcpudp_10() == 6))  //TCP Protocol
+		Processing_tcp_packet(packet_body , size, ip_protocol);
     
-	else if ((protocol == 17) && udp.getTcpudp() == 17) //UDP Protocol
-		Processing_udp_packet(packet_body , size);
+	else if ((protocol == 17) && udp.getTcpudp_10() == 17) //UDP Protocol
+		Processing_udp_packet(packet_body , size, ip_protocol);
 	else
 		return;
 }
@@ -481,10 +606,21 @@ void sig_handler(int signum){
 	logger.log(buff);
 	sprintf(buff, "        udp: %d", udp_number);
 	logger.log(buff);
+ 	sprintf(buff, "       IPv4: %d", ipv4_number);
+	logger.log(buff);
+	sprintf(buff, "       IPv6: %d", ipv6_number);
+	logger.log(buff);
+	sprintf(buff, "        arp: %d", arp_number);
+	logger.log(buff);
+	
 
 	tcp_number = 0;
 	udp_number = 0;
 	packet_number = 0;
+	ipv4_number = 0;
+	ipv6_number = 0;
+	arp_number = 0;
+
 }
 
 
