@@ -2,12 +2,12 @@
 	"json_device" : 1,
 	"json_number" : 10,
 	"json_time" : 10,
-	"json_log" : "debug",
-	"json_tcp" : "tcp.json",
-	"json_udp" : "udp.json",
-	"json_ipv4" : "ipv4.json",
-	"json_ipv6" : "ipv6.json",
-	"json_arp" : "arp.json",
-	"dns" : "disable",
-	"http" : "disable"
+	"json_log" : "info",
+	"protocol_list" : [ "tcp", "udp", "ipv4", "ipv6" ],
+	"protocol_tcp" : "tcp.json",
+	"protocol_udp" : "udp.json",
+	"protocol_ipv4" : "ipv4.json",
+	"protocol_ipv6" : "ipv6.json",
+	"protocol_dns" : "disable",
+	"protocol_http" : "disable"
 }
