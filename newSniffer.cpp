@@ -316,15 +316,23 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         // check all property and its constraint of protocol
         for (Property property : protocol.properties) {
 
-			// now we just can check one byte
-            if (property.start_byte == property.end_byte) {
-                if (property.constraint == -2) {
-                    printf("size will check here... (if constraint fixed -2)");
+			// check packet size
+	        if (property.constraint == -2){
 
-                } else if (property.constraint == *(check + property.start_byte - 1)) {
+				// calculate size from specified bytes of packet
+				int calculated_size = (*(check + property.start_byte - 1)) * 256 + (*(check + property.end_byte - 1)) + 14; 
+				int structure_size = packet_header->len;
+				
+				if (calculated_size == structure_size){
+					protocol.probability += property.probability_change;
+				}
+			}
+             
+			// for now we just check one byte and also two bytes of size
+            if (property.start_byte == property.end_byte)
+  				if (property.constraint == *(check + property.start_byte - 1))
                     protocol.probability += property.probability_change;
-             	}
-            }
+
         }
   
     	sprintf(logBuffer, "%11s: %%%d", protocol.name, protocol.probability);
@@ -356,8 +364,14 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 
     //debug
-    sprintf(logBuffer, "size: %d \t", packet_header->len);
+    sprintf(logBuffer, "struct_size: %d \t", packet_header->len);
     logger.log(logBuffer, "debug");
+
+
+    //debug
+    sprintf(logBuffer, "byte_size: %d \t %d ", *(ip_header + 2), *(ip_header + 3));
+    logger.log(logBuffer, "debug");
+
 }
 
 
@@ -685,3 +699,4 @@ int main() {
     closelog();
     return 0;
 }
+
