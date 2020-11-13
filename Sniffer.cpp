@@ -5,7 +5,6 @@
 
 using namespace std;
 
-
 #include <pcap.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,110 +23,106 @@ using namespace std;
 #include<unistd.h>
 
 
-// this class save protocol feature
-class Protocol {
-
-private:
-	int tcpudp_10 = -1;
-	int ip_13 = -1;
-	int ip_14 = -1;
+// this class save properties of protocols
+class Property{
 
 public:
-	// setter
-    void setTcpudp_10(int tu) {
-      tcpudp_10 = tu;
-    }
-    void setIp_13(int tu) {
-      ip_13 = tu;
-    }
-    void setIp_14(int tu) {
-      ip_14 = tu;
-    }
-
-    // getter
-    int getTcpudp_10() {
-      return tcpudp_10;
-    }
-    int getIp_13() {
-      return ip_13;
-    }
-    int getIp_14() {
-      return ip_14;
-    }
-
+    int start_byte;
+    int end_byte;
+    int constraint;
+    int probability_change;
 };
+
+
+// class protocol holds information of each protocol
+class Protocol {
+
+public:
+
+    char name [10];
+    char layer [15];
+    int probability = 0; // percentage probability of this protocol 
+    vector <Property> properties;
+};
+
+// bara in 2 ta class vaght nashod ba getter , setter car konim, dang o fang dare stringash...
+
+
+// list of all enable protocols to check each packet with them
+vector <Protocol> protocols;
+
 
 // this class log important event of the program
 class Logger {
 
 private:
-	string configType; //log type that selected in config file
+    string configType; //log type that selected in config file
 
 public:
-	// setter
+    // setter
     void setConfigType(string t) {
-      configType = t;
+        configType = t;
     }
 
     // getter
     string getConfigType() {
-      return configType;
-    } 
+        return configType;
+    }
 
-	// constructor of Logger class
-	Logger(string typ){
-		configType = typ;
-		spdlog::enable_backtrace(64);
-	}
-	
-	// get message and log with choose level
-	// and log if selected level in config file is the same as log 
+    // constructor of Logger class
+    Logger(string typ){
+        configType = typ;
+        spdlog::enable_backtrace(64);
+    }
+
+    // get message and log with choose level
+    // and log if selected level in config file is the same as log
     void log(string message, string logType){
 
-	    if (configType == "debug" && logType == "debug"){
+        if (configType == "debug" && logType == "debug"){
 
-			spdlog::debug(message);
-			//spdlog::dump_backtrace(); // write this line when ever want to see dubug logs
+            spdlog::debug(message);
+            //spdlog::dump_backtrace(); // write this line when ever want to see dubug logs
 
-		}else if (configType == "info" && logType == "info")
+        }else if (configType == "info" && logType == "info")
 
-			spdlog::info(message);
-	
-		else if (configType == "warn" && logType == "warn")
+            spdlog::info(message);
 
-			spdlog::warn(message);
-			
-		else if (configType == "error" && logType == "error")
+        else if (configType == "warn" && logType == "warn")
 
-			spdlog::error(message);
+            spdlog::warn(message);
 
-		else if (configType == "critical" && logType == "critical")
-		
-			spdlog::critical(message);
-	}
+        else if (configType == "error" && logType == "error")
+
+            spdlog::error(message);
+
+        else if (configType == "critical" && logType == "critical")
+
+            spdlog::critical(message);
+    }
 
 };
+
 
 // create global logger object to use it all over the program
 Logger logger("0");
 
+
 // create a buffer to make log with it using sprintf
 char logBuffer [50];
 
-// number of captured packets
-int packet_number = 0;
-int tcp_number = 0;
-int udp_number = 0;
-int ipv4_number = 0;
-int ipv6_number = 0;
-int arp_number = 0;
 
 // an struct to hold name and ip of packets
 struct device {
 
-	char name [20];
-	char ip [16];
+    char name [20];
+    char ip [16];
 };
+
+
+// number of captured packet
+int packet_number = 0;
+
 
 // an struct to hold source and destination of a packet 
 struct IP {
@@ -163,6 +158,7 @@ char* find_printable_payload(const u_char *payload, int len){
 	return tmp;
 }
 
+
 // print useful data of ip header
 void print_ip_header(int Size, struct IP ip) {
 	
@@ -173,6 +169,7 @@ void print_ip_header(int Size, struct IP ip) {
     sprintf(logBuffer, "     Dst IP: %s", ip.dst);
 	logger.log(logBuffer, "info");
 }
+
 
 // separate useful part of ip header
 struct IP Processing_ip_header(const u_char * Buffer, int Size) {
@@ -198,6 +195,7 @@ struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 	return ip;
 }
 
+
 // print useful data of tcp header
 void print_tcp_header(const u_char * Buffer, int Size, struct tcphdr *tcph) {
 
@@ -207,6 +205,7 @@ void print_tcp_header(const u_char * Buffer, int Size, struct tcphdr *tcph) {
 	logger.log(logBuffer, "info");
 }
 
+
 // print useful data of udp header
 void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
 
@@ -214,15 +213,12 @@ void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
 	logger.log(logBuffer, "info");
     sprintf(logBuffer, "   Dst port: %d", ntohs(udph->dest));
 	logger.log(logBuffer, "info");
-	
-	if ( (ntohs(udph->source) == 53) || (ntohs(udph->dest) == 53))
-		logger.log("        DNS: Yes", "info");
-	else
-		logger.log("        DNS: No", "info");	
+		
 }
 
+
 // separate useful part of tcp packet
-void Processing_tcp_packet(const u_char * Buffer, int Size, char* ip_protocol) {
+void Processing_tcp_packet(const u_char * Buffer, int Size) {
     
     unsigned short iphdrlen;
 	
@@ -240,47 +236,19 @@ void Processing_tcp_packet(const u_char * Buffer, int Size, char* ip_protocol) {
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 
-	logger.log(" ", "info");
-	packet_number ++;
-	tcp_number ++;
-    sprintf(logBuffer, "     number: %d", packet_number);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Protocol: %s", ip_protocol);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Protocol: TCP");
-	logger.log(logBuffer, "info");
+    //sprintf(logBuffer, "   Protocol: TCP");
+	//logger.log(logBuffer, "info");
 	
 	print_ip_header(Size, ip);
-    	print_tcp_header(Buffer, Size, tcph);
-
-	if (strstr(printable_payload, "HTTP") != NULL)
-		logger.log("       HTTP: Yes", "info");
-	else 
-		logger.log("       HTTP: No", "info");
+    print_tcp_header(Buffer, Size, tcph);
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
 }
 
+
 // separate useful part of udp packet
-void Processing_udp_packet(const u_char * Buffer, int Size, char *ip_protocol){
-
-	// read config file
-	char buffer [1024];
-	FILE *fp;
-	fp = fopen ("config.json", "r");
-	fread (buffer,1024, 1, fp);
-	fclose (fp);
-
-	struct json_object *parsed_json;	
-	struct json_object *json_device;
-    struct json_object *json_number;
-
-    parsed_json = json_tokener_parse(buffer);
-
-    json_object_object_get_ex (parsed_json, "json_device", &json_device);
-    json_object_object_get_ex (parsed_json, "json_number", &json_number);
-
+void Processing_udp_packet(const u_char * Buffer, int Size){
 
 	unsigned short iphdrlen;
 	
@@ -297,15 +265,8 @@ void Processing_udp_packet(const u_char * Buffer, int Size, char *ip_protocol){
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 
-	logger.log(" ", "info");
-	packet_number ++;
-	udp_number ++;
-    sprintf(logBuffer, "     number: %d", packet_number);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Protocol: %s", ip_protocol);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Protocol: UDP");
-	logger.log(logBuffer, "info");
+    //sprintf(logBuffer, "   Protocol: UDP");
+	//logger.log(logBuffer, "info");
 	
 	print_ip_header(Size, ip);
 	print_udp_header(Buffer , Size, udph);
@@ -314,178 +275,9 @@ void Processing_udp_packet(const u_char * Buffer, int Size, char *ip_protocol){
 	//logger.log(logBuffer, "info");
 }
 
+
 // the major part of the program that gets a packet and extract important data of it
-void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body)
-{
-
-  	// read config file
-    char buffer [512];
-    FILE *fp;
-    fp = fopen ("config.json", "r");
-    fread (buffer, 512, 1, fp);
-    fclose (fp);
-
-    struct json_object *parsed_json;
-    struct json_object *json_tcp;
-    struct json_object *json_udp;
-	struct json_object *json_ipv4;
-	struct json_object *json_ipv6;
-	struct json_object *json_arp;
-
-    parsed_json = json_tokener_parse(buffer);
-
-    json_object_object_get_ex (parsed_json, "json_tcp", &json_tcp);
-    json_object_object_get_ex (parsed_json, "json_udp", &json_udp);
-	json_object_object_get_ex (parsed_json, "json_ipv4", &json_ipv4);
-    json_object_object_get_ex (parsed_json, "json_ipv6", &json_ipv6);
-    json_object_object_get_ex (parsed_json, "json_arp", &json_arp);
-
-    char tcp_add [15];
-    strcpy (tcp_add, json_object_get_string(json_tcp));
-    char udp_add [15];
-    strcpy (udp_add, json_object_get_string(json_udp));
-	char ipv4_add [15];
-    strcpy (ipv4_add, json_object_get_string(json_ipv4));
-    char ipv6_add [15];
-    strcpy (ipv6_add, json_object_get_string(json_ipv6));
-	char arp_add [15];
-    strcpy (arp_add, json_object_get_string(json_arp));
-
-	// crate object from classes
-	Protocol tcp;
-	Protocol udp;
-	Protocol ipv4;
-	Protocol ipv6;
-	Protocol arp;
-
-	// fill classes with data of config files if they are enable
-	if (strcmp(tcp_add, "disable") != 0){
-	
-		// read this protocol config file
-		char buffer [512];
-		FILE *fp;
-		fp = fopen (tcp_add, "r");
-		fread (buffer, 512, 1, fp);
-		fclose (fp);
-
-		struct json_object *parsed_json;
-		struct json_object *json_tcpudp_10;
-
-		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_tcpudp_10", &json_tcpudp_10);
-
-		tcp.setTcpudp_10 (json_object_get_int(json_tcpudp_10));
-
-	}
-	if (strcmp(udp_add, "disable") != 0){
-		
-		// read this protocol config file
-		char buffer [512];
-		FILE *fp;
-		fp = fopen (udp_add, "r");
-		fread (buffer, 512, 1, fp);
-		fclose (fp);
-
-		struct json_object *parsed_json;
-		struct json_object *json_tcpudp_10;
-
-		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_tcpudp_10", &json_tcpudp_10);
-
-		udp.setTcpudp_10 (json_object_get_int(json_tcpudp_10));
-
-	}
-	if (strcmp(ipv4_add, "disable") != 0){
-		
-		// read this protocol config file
-		char buffer [512];
-		FILE *fp;
-		fp = fopen (ipv4_add, "r");
-		fread (buffer, 512, 1, fp);
-		fclose (fp);
-
-		struct json_object *parsed_json;
-		struct json_object *json_ip_13;
-		struct json_object *json_ip_14;
-
-		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
-		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
-
-		ipv4.setIp_13 (json_object_get_int(json_ip_13));
-		ipv4.setIp_14 (json_object_get_int(json_ip_14));
-	}
-	if (strcmp(ipv6_add, "disable") != 0){
-		
-		// read this protocol config file
-		char buffer [512];
-		FILE *fp;
-		fp = fopen (ipv6_add, "r");
-		fread (buffer, 512, 1, fp);
-		fclose (fp);
-
-		struct json_object *parsed_json;
-		struct json_object *json_ip_13;
-		struct json_object *json_ip_14;
-
-		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
-		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
-
-		ipv6.setIp_13 (json_object_get_int(json_ip_13));
-		ipv6.setIp_14 (json_object_get_int(json_ip_14));
-
-	}
-	if (strcmp(arp_add, "disable") != 0){
-		
-		// read this protocol config file
-		char buffer [512];
-		FILE *fp;
-		fp = fopen (arp_add, "r");
-		fread (buffer, 512, 1, fp);
-		fclose (fp);
-
-		struct json_object *parsed_json;
-		struct json_object *json_ip_13;
-		struct json_object *json_ip_14;
-
-		parsed_json = json_tokener_parse(buffer);
-		json_object_object_get_ex (parsed_json, "json_ip_13", &json_ip_13);
-		json_object_object_get_ex (parsed_json, "json_ip_14", &json_ip_14);		
-
-		arp.setIp_13 (json_object_get_int(json_ip_13));
-		arp.setIp_14 (json_object_get_int(json_ip_14));
-
-	}
-
-    u_char protocol_byte_13 = *(packet_body + 12);
-	u_char protocol_byte_14 = *(packet_body + 13);
-
-	// debug
-    sprintf(logBuffer, "proto %d\t %d", protocol_byte_13, protocol_byte_14);
-	logger.log(logBuffer, "debug");
-    sprintf(logBuffer, "ipv4 %d\t %d", ipv4.getIp_13(), ipv4.getIp_14());
-	logger.log(logBuffer, "debug");
-    sprintf(logBuffer, "arp %d\t %d", arp.getIp_13(), arp.getIp_14());
-	logger.log(logBuffer, "debug");
-
-	char ip_protocol [10];
-
-    if ((protocol_byte_13 == 8) && (ipv4.getIp_13() == 8) && (protocol_byte_14 == 0) && (ipv4.getIp_14() == 0)){  //ipv4 Protocol
-		strcpy (ip_protocol, "IPv4");
-		ipv4_number ++; 
-
-	}else if ((protocol_byte_13 == 134) && (ipv6.getIp_13() == 134) && (protocol_byte_14 == 221) && (ipv6.getIp_14() == 221)){  //ipv6 Protocol
-		strcpy (ip_protocol, "IPv6");
-		ipv6_number ++;	
-
-	}else if ((protocol_byte_13 == 8) && (arp.getIp_13() == 8) && (protocol_byte_14 == 6) && (arp.getIp_14() == 6)){  //arp Protocol
-		strcpy (ip_protocol, "ARP");
-		arp_number ++;
-
-	}else{
-		return;
-	}
+void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body) {
 
     // Pointers to start point of header.
     const u_char *ip_header;
@@ -496,47 +288,206 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     //start of IP header
     ip_header = packet_body + ethernet_header_length;
 
-    //Protocol is always the 10th byte of the IP header
-    u_char protocol = *(ip_header + 9);
 
-	int size = packet_header->len;
-	
-	//debug
-    sprintf(logBuffer, "%d \t", tcp.getTcpudp_10());
-	logger.log(logBuffer, "debug");
-    sprintf(logBuffer, "%d \t", udp.getTcpudp_10());
-	logger.log(logBuffer, "debug");
+    logger.log(" ", "info");
+    sprintf(logBuffer, "     number: %d", ++packet_number);
+    logger.log(logBuffer, "info");
 
-    if ((protocol == 6) && (tcp.getTcpudp_10() == 6))  //TCP Protocol
-		Processing_tcp_packet(packet_body , size, ip_protocol);
-    
-	else if ((protocol == 17) && udp.getTcpudp_10() == 17) //UDP Protocol
-		Processing_udp_packet(packet_body , size, ip_protocol);
+	// select between tcp or udp for printing data
+	int tcpORudp = 0;	
 
-	else
-		return;
+    //check each protocol
+    for (Protocol protocol : protocols) {
+
+        const u_char *check;
+
+        //if (protocol.layer == "internet"){
+		if (strcmp(protocol.layer , "internet") == 0){
+        	check = packet_body;
+		
+		}else if (strcmp(protocol.layer , "transport") == 0){
+        //}else if (protocol.layer == "transport"){
+            check = ip_header;
+
+        }else if (strcmp(protocol.layer , "application") == 0)
+			printf("comming soon...");
+
+
+        // check all property and its constraint of protocol
+        for (Property property : protocol.properties) {
+
+			// check packet size
+	        if (property.constraint == -2){
+
+				// calculate size from specified bytes of packet
+				int calculated_size = (*(check + property.start_byte - 1)) * 256 + (*(check + property.end_byte - 1)) + 14; 
+				int structure_size = packet_header->len;
+				
+				if (calculated_size == structure_size){
+					protocol.probability += property.probability_change;
+				}
+			}
+             
+			// for now we just check one byte and also two bytes of size
+            if (property.start_byte == property.end_byte)
+  				if (property.constraint == *(check + property.start_byte - 1))
+                    protocol.probability += property.probability_change;
+
+        }
+  
+    	sprintf(logBuffer, "%11s: %%%d", protocol.name, protocol.probability);
+        logger.log(logBuffer, "info");
+			
+		
+		// save protocol with more probability between tcp or udp, (considered that we always check tcp first)
+		int tcp_probability = 0;
+		if ((strcmp(protocol.name , "tcp") == 0) && (protocol.probability >= 50)){
+			tcp_probability = protocol.probability;
+			tcpORudp = 1;		
+		}else if ((strcmp(protocol.name , "udp") == 0) && (protocol.probability >= 50))
+			if (protocol.probability > tcp_probability)
+				tcpORudp = 2;
+
+    }
+
+		// print important data of packet
+		int size = packet_header->len;
+		if (tcpORudp == 1)
+			Processing_tcp_packet(packet_body , size);
+		else if (tcpORudp == 2)
+			Processing_tcp_packet(packet_body , size);
+			
+
+    // debug
+    sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));
+    logger.log(logBuffer, "debug");
+
+
+    //debug
+    sprintf(logBuffer, "struct_size: %d \t", packet_header->len);
+    logger.log(logBuffer, "debug");
+
+
+    //debug
+    sprintf(logBuffer, "byte_size: %d \t %d ", *(ip_header + 2), *(ip_header + 3));
+    logger.log(logBuffer, "debug");
+
 }
+
+
+// parse config file and make object
+void json_parse_config (json_object * jobj) {
+
+	// ya C++ kheili cherte ya json-c, chand saate rooye copy kardan ye string az to json be vector moonadm. 
+	// list of all protocol	
+	char protocol_list [10][10];
+
+    // check all the key/value of config file
+    json_object_object_foreach(jobj, key, val) {
+        enum json_type type;
+        type = json_object_get_type(val);
+
+        string keylid = key;
+
+	// fill protocols list
+	if (keylid == "protocol_list"){
+
+        json_object *jarray = jobj;
+        jarray = json_object_object_get(jobj, key);
+
+		int arraylen = json_object_array_length(jarray);
+        json_object *jvalue;
+
+		for (int i=0; i< arraylen; i++){
+			jvalue = json_object_array_get_idx(jarray, i);
+
+        	sprintf(protocol_list[i], "%s", json_object_get_string(jvalue));			
+		}
+
+
+        // if key stars with "protocol_" means that is related to a protocol
+        }else if (keylid.rfind("protocol_", 0) == 0) {
+
+            // WASTED more than an hour, i dont understand why not next line work correctly.
+            //string value = json_object_get_string(val);
+            char value[20] = "";
+            sprintf(value, "%s", json_object_get_string(val));
+
+	
+            // if the protocol is not disable, make an object and read its specific file
+            if (strcmp(value, "disable") != 0) {
+
+                Protocol prot;
+                //prot.name = keylid.substr(9);
+
+				// save protocol name 
+				static int i = 0;
+				sprintf(prot.name, "%s", protocol_list[i++]);
+	
+
+                char buffer[512] = "";
+                FILE *fp;
+                fp = fopen(value, "r");
+                fread(buffer, 512, 1, fp);
+                fclose(fp);
+
+                json_object *jobj = json_tokener_parse(buffer);
+                enum json_type type;
+
+                // read all the property saved in the file
+                json_object_object_foreach(jobj, key, val) {
+
+		            type = json_object_get_type(val);
+		            if (type == json_type_array) {
+
+		                Property prop;
+
+		                json_object *jarray = jobj;
+		                jarray = json_object_object_get(jobj, key);
+
+		                json_object *jvalue;
+		                prop.start_byte = json_object_get_int( json_object_array_get_idx(jarray, 0));
+		                prop.end_byte = json_object_get_int( json_object_array_get_idx(jarray, 1));
+		                prop.constraint = json_object_get_int( json_object_array_get_idx(jarray, 2));
+		                prop.probability_change = json_object_get_int( json_object_array_get_idx(jarray, 3));
+
+		                // add each property to property list of protocol
+		                prot.properties.push_back(prop);
+
+		            }else{
+		                //if (key == "layer")
+						sprintf(prot.layer, "%s", json_object_get_string(val));
+		            }
+
+                }
+                // add new protocol to protocol list
+                protocols.push_back(prot);
+            }
+        }
+    }
+}
+
 
 // show all available device and choose one of them to sniff
 struct device select_device(int device_num){
 
     pcap_if_t *alldevsp , *device;
     //char devs[100][100];
-	struct device devices [20];
-	char *errbuf;
-	int count = 1;
-	int n;
+    struct device devices [20];
+    char *errbuf;
+    int count = 1;
+    int n;
 
-	//get the list of available devices
+    //get the list of available devices
     printf("Finding available devices ... ");
     if( pcap_findalldevs( &alldevsp , errbuf) )
     {
         //printf("Error finding devices : %s" , errbuf);
-		logger.log("Error finding devices", "error");
+        logger.log("Error finding devices", "error");
         exit(1);
     }
     printf("Done");
-     
+
     //Print the available devices
     printf("\n\nAvailable Devices are :\n");
     for(device = alldevsp ; device != NULL ; device = device->next)
@@ -544,214 +495,205 @@ struct device select_device(int device_num){
         printf("%d. %s - %s\n" , count , device->name , device->description);
         if(device->name != NULL)
         {
-			// save device name
+            // save device name
             strcpy(devices[count].name , device->name);
 
-			// save device ip
-			for(pcap_addr_t *a=device->addresses; a!=NULL; a=a->next) {
-            	if(a->addr->sa_family == AF_INET) 
-            		strcpy(devices[count].ip , inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
-        	}
+            // save device ip
+            for(pcap_addr_t *a=device->addresses; a!=NULL; a=a->next) {
+                if(a->addr->sa_family == AF_INET)
+                    strcpy(devices[count].ip , inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
+            }
 
         }
         count++;
     }
-     
+
 
     printf("\nNumber of device you want to sniff : %d", device_num);
 
-	// copy and return selected device
-	struct device selected_device;
-	strcpy(selected_device.name, devices[device_num].name);
-	strcpy(selected_device.ip, devices[device_num].ip);
+    // copy and return selected device
+    struct device selected_device;
+    strcpy(selected_device.name, devices[device_num].name);
+    strcpy(selected_device.ip, devices[device_num].ip);
 
     return selected_device;
 
- }
+}
 
 
 // detect address class
 char addres_class_detection(char ip_reference [20]){
 
-	// copy ip to a variable. not to change the ip
-	char ip [20];
-	strcpy(ip, ip_reference);
+    // copy ip to a variable. not to change the ip
+    char ip [20];
+    strcpy(ip, ip_reference);
 
-	// get first part of ip
-	char * class_pointer = strtok(ip, ".");
+    // get first part of ip
+    char * class_pointer = strtok(ip, ".");
 
-	// convert to integer
-	int class_add = atoi(class_pointer);
+    // convert to integer
+    int class_add = atoi(class_pointer);
 
-	if (1 <= class_add && class_add <= 127)
-		 return 'A';
-	else if (128 <= class_add && class_add <= 191)
-		 return 'B';
-	else if (192 <= class_add && class_add <= 223)
-		 return 'C';
-	else if (224 <= class_add && class_add <= 239)
-		 return 'D';		 
-	else if (240 <= class_add && class_add <= 247)
-		 return 'E';	 
+    if (1 <= class_add && class_add <= 127)
+        return 'A';
+    else if (128 <= class_add && class_add <= 191)
+        return 'B';
+    else if (192 <= class_add && class_add <= 223)
+        return 'C';
+    else if (224 <= class_add && class_add <= 239)
+        return 'D';
+    else if (240 <= class_add && class_add <= 247)
+        return 'E';
 }
 
 
 // define handle global, to use it in sig_handler function
 pcap_t *handle;
 
+
 // time of each period of capturing
 int capture_time;
+
 
 // run this function after an specific time of capturing
 void sig_handler(int signum){
 
-	pcap_breakloop(handle);
+    pcap_breakloop(handle);
 
-	logger.log(" ", "info");
+    logger.log(" ", "info");
     sprintf(logBuffer, "number of packets in last %d seconds: %d", capture_time, packet_number);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "        tcp: %d", tcp_number);
-	logger.log(logBuffer, "info");
-	sprintf(logBuffer, "        udp: %d", udp_number);
-	logger.log(logBuffer, "info");
- 	sprintf(logBuffer, "       IPv4: %d", ipv4_number);
-	logger.log(logBuffer, "info");
-	sprintf(logBuffer, "       IPv6: %d", ipv6_number);
-	logger.log(logBuffer, "info");
-	sprintf(logBuffer, "        arp: %d", arp_number);
-	logger.log(logBuffer, "info");
-	
-	tcp_number = 0;
-	udp_number = 0;
-	packet_number = 0;
-	ipv4_number = 0;
-	ipv6_number = 0;
-	arp_number = 0;
-	
-	if (logger.getConfigType() == "debug")
-		spdlog::dump_backtrace(); 
+    logger.log(logBuffer, "info");
+
+    packet_number = 0;
+
+    if (logger.getConfigType() == "debug")
+        spdlog::dump_backtrace();
 
 }
+
 
 
 // the main function
 int main() {
 
-	printf("Packet Sniffer\n");
-	printf("Mahdi Hejrati\n\n");
+    printf("Packet Sniffer\n");
+    printf("Mahdi Hejrati\n\n");
 
     struct device device; // device to sniff on
-    //pcap_t *handle; // session handle
     char error_buffer[PCAP_ERRBUF_SIZE]; // error string
-	// filter expression (second part of the following expression means to filter packet with body)
-    //char filter_exp[] = "((tcp port 8765) or (udp port 53))and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)";
-	char filter_exp[] = "";
-	struct bpf_program filter; // compiled filter
+    char filter_exp[] = "";
+    struct bpf_program filter; // compiled filter
     bpf_u_int32 raw_mask; // subnet mask
-	bpf_u_int32 ip; // ip
+    bpf_u_int32 ip; // ip
     struct in_addr addr;
-	char *mask; // dot notation of the network mask
-	char addres_class; // ip address class between A, B, C, ...
-	struct pcap_pkthdr header; //header that pcap gives us
-	const u_char *packet; // actual packet
-	
+    char *mask; // dot notation of the network mask
+    char addres_class; // ip address class between A, B, C, ...
+    struct pcap_pkthdr header; //header that pcap gives us
+    const u_char *packet; // actual packet
 
-	// read config file
-	char buffer [512];
-	FILE *fp;
-	fp = fopen ("config.json", "r");
-	fread (buffer, 512, 1, fp);
-	fclose (fp);
 
-	// declare struct to read json
-	struct json_object *parsed_json;	
-	struct json_object *json_device;
+    // read config file once and then make objects
+    char buffer [512] = "";
+    FILE *fp;
+    fp = fopen ("config.json", "r");
+    fread (buffer, 512, 1, fp);
+    fclose (fp);
+
+
+    // declare struct to read json
+    struct json_object *parsed_json;
+    struct json_object *json_device;
     struct json_object *json_number;
     struct json_object *json_time;
-	struct json_object *json_log;
+    struct json_object *json_log;
 
     parsed_json = json_tokener_parse(buffer);
 
-  	json_object_object_get_ex (parsed_json, "json_device", &json_device);
+    json_object_object_get_ex (parsed_json, "json_device", &json_device);
     json_object_object_get_ex (parsed_json, "json_number", &json_number);
     json_object_object_get_ex (parsed_json, "json_time", &json_time);
     json_object_object_get_ex (parsed_json, "json_log", &json_log);
 
-	int device_num; // device number to capture
-       	device_num = json_object_get_int(json_device);
-	int num_packets; // number of packets to capture 
-        num_packets = json_object_get_int(json_number);
-   	capture_time = json_object_get_int(json_time);	
-	string log_type; // log level
-		log_type = json_object_get_string(json_log);
+    int device_num; // device number to capture
+    device_num = json_object_get_int(json_device);
+    int num_packets; // number of packets to capture
+    num_packets = json_object_get_int(json_number);
+    capture_time = json_object_get_int(json_time);
+    string log_type; // log level
+    log_type = json_object_get_string(json_log);
 
-	// set log level
-	logger.setConfigType(log_type);
+    // set log level
+    logger.setConfigType(log_type);
 
 
-	// select device
-	device = select_device(device_num);
+    // make object of "enable" protocol to analyze it
+    json_object * json_config = json_tokener_parse(buffer);
+    json_parse_config(json_config);
 
-	// ask pcap for the network address and mask of the device
+
+    // select device
+    device = select_device(device_num);
+
+    // ask pcap for the network address and mask of the device
     if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1){
 
         //printf("Couldn't read device %s information - %s\n", device.name, error_buffer);
-		logger.log("Couldn't read selected device information", "error");
+        logger.log("Couldn't read selected device information", "error");
     }
-	
-	// get the subnet mask in a human readable form
+
+    // get the subnet mask in a human readable form
     addr.s_addr = raw_mask;
     mask = inet_ntoa(addr);
 
-	addres_class = addres_class_detection (device.ip);
+    addres_class = addres_class_detection (device.ip);
 
-	// print device information
-	printf("\nDevice info\n");
-	printf("Name: %s\n", device.name);
-	printf("IP: %s\n", device.ip);
-	printf("Mask: %s\n" , mask);
-	printf("Class: %c\n", addres_class);
-	  
-	printf("\nNumber of packets you want to capture: %d", num_packets);
+    // print device information
+    printf("\nDevice info\n");
+    printf("Name: %s\n", device.name);
+    printf("IP: %s\n", device.ip);
+    printf("Mask: %s\n" , mask);
+    printf("Class: %c\n", addres_class);
 
-	// open device in promiscuous mode
+    printf("\nNumber of packets you want to capture: %d", num_packets);
+
+    // open device in promiscuous mode
     handle = pcap_open_live(device.name, BUFSIZ, 1, 0, error_buffer);
     if (handle == NULL) {
-		logger.log("Couldn't open selected device", "error");
+        logger.log("Couldn't open selected device", "error");
         return 1;
-	}
+    }
 
-	// compile the filter expression
+    // compile the filter expression
     if (pcap_compile(handle, &filter, filter_exp, 0, ip) == -1) {
-		logger.log("Bad filter", "error");
+        logger.log("Bad filter", "error");
         return 1;
     }
-	// apply the compiled filter
+    // apply the compiled filter
     if (pcap_setfilter(handle, &filter) == -1) {
-		logger.log("Error setting filter", "error");
+        logger.log("Error setting filter", "error");
         return 1;
     }
 
-	// print capture info
-	printf("\n\nStart sniffing...\n");
-	printf("period time: %d\n\n", capture_time);
+    // print capture info
+    printf("\n\nStart sniffing...\n");
+    printf("period time: %d\n\n", capture_time);
 
 
-	while (1) {
-		
-		// here we set an alarm for an specific time and then sig_handler function run
-		signal(SIGALRM, sig_handler);
-		alarm(capture_time);
+    while (1) {
 
-		// start sniffing
-		pcap_loop(handle, num_packets, packet_handler, NULL);
+        // here we set an alarm for an specific time and then sig_handler function run
+        signal(SIGALRM, sig_handler);
+        alarm(capture_time);
 
-	}
+        // start sniffing
+        pcap_loop(handle, num_packets, packet_handler, NULL);
+
+    }
 
 
-	// cleanup 
-	pcap_freecode(&filter);
-	pcap_close(handle);
+    // cleanup
+    pcap_freecode(&filter);
+    pcap_close(handle);
 
 
     closelog();
