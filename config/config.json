@@ -4,10 +4,10 @@
 	"json_time" : 10,
 	"json_log" : "info",
 	"protocol_list" : [ "tcp", "udp", "ipv4", "ipv6" ],
-	"protocol_tcp" : "tcp.json",
-	"protocol_udp" : "udp.json",
-	"protocol_ipv4" : "ipv4.json",
-	"protocol_ipv6" : "ipv6.json",
+	"protocol_tcp" : "config/tcp.json",
+	"protocol_udp" : "config/udp.json",
+	"protocol_ipv4" : "config/ipv4.json",
+	"protocol_ipv6" : "config/ipv6.json",
 	"protocol_dns" : "disable",
 	"protocol_http" : "disable"
 }

@@ -1,7 +1,13 @@
+// include dependent classes
+#include "Logger.h"
+#include "Logger.cpp"
+
+
 #include <locale>
 #include <json-c/json.h>
 #include "spdlog/spdlog.h"
 #include <string>
+#include <string.h>
 
 using namespace std;
 
@@ -50,58 +56,6 @@ public:
 
 // list of all enable protocols to check each packet with them
 vector <Protocol> protocols;
-
-
-// this class log important event of the program
-class Logger {
-
-private:
-    string configType; //log type that selected in config file
-
-public:
-    // setter
-    void setConfigType(string t) {
-        configType = t;
-    }
-
-    // getter
-    string getConfigType() {
-        return configType;
-    }
-
-    // constructor of Logger class
-    Logger(string typ){
-        configType = typ;
-        spdlog::enable_backtrace(64);
-    }
-
-    // get message and log with choose level
-    // and log if selected level in config file is the same as log
-    void log(string message, string logType){
-
-        if (configType == "debug" && logType == "debug"){
-
-            spdlog::debug(message);
-            //spdlog::dump_backtrace(); // write this line when ever want to see dubug logs
-
-        }else if (configType == "info" && logType == "info")
-
-            spdlog::info(message);
-
-        else if (configType == "warn" && logType == "warn")
-
-            spdlog::warn(message);
-
-        else if (configType == "error" && logType == "error")
-
-            spdlog::error(message);
-
-        else if (configType == "critical" && logType == "critical")
-
-            spdlog::critical(message);
-    }
-
-};
 
 
 // create global logger object to use it all over the program
@@ -500,7 +454,8 @@ struct device select_device(int device_num){
 
             // save device ip
             for(pcap_addr_t *a=device->addresses; a!=NULL; a=a->next) {
-                if(a->addr->sa_family == AF_INET)
+                //if(a->addr->sa_family == AF_INET) ?
+                if(a->addr->sa_family == 2)
                     strcpy(devices[count].ip , inet_ntoa(((struct sockaddr_in*)a->addr)->sin_addr));
             }
 
@@ -580,7 +535,8 @@ int main() {
     printf("Mahdi Hejrati\n\n");
 
     struct device device; // device to sniff on
-    char error_buffer[PCAP_ERRBUF_SIZE]; // error string
+    //char error_buffer[PCAP_ERRBUF_SIZE]; // error string ?
+    char error_buffer[256]; // error string
     char filter_exp[] = "";
     struct bpf_program filter; // compiled filter
     bpf_u_int32 raw_mask; // subnet mask
@@ -595,7 +551,7 @@ int main() {
     // read config file once and then make objects
     char buffer [512] = "";
     FILE *fp;
-    fp = fopen ("config.json", "r");
+    fp = fopen ("config/config.json", "r");
     fread (buffer, 512, 1, fp);
     fclose (fp);
 
@@ -682,7 +638,8 @@ int main() {
     while (1) {
 
         // here we set an alarm for an specific time and then sig_handler function run
-        signal(SIGALRM, sig_handler);
+        //signal(SIGALRM, sig_handler); ?
+        signal(14, sig_handler);
         alarm(capture_time);
 
         // start sniffing
