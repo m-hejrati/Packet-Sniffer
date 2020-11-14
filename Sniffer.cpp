@@ -1,6 +1,10 @@
 // include dependent classes
 #include "Logger.h"
-#include "Logger.cpp"
+#include "Logger.cpp" // ?
+#include "Property.h"
+#include "Property.cpp" // ?
+#include "Protocol.h"
+#include "Protocol.cpp" // ?
 
 
 #include <locale>
@@ -13,7 +17,6 @@ using namespace std;
 
 #include <pcap.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <syslog.h>
@@ -28,30 +31,6 @@ using namespace std;
 #include<signal.h>
 #include<unistd.h>
 
-
-// this class save properties of protocols
-class Property{
-
-public:
-    int start_byte;
-    int end_byte;
-    int constraint;
-    int probability_change;
-};
-
-
-// class protocol holds information of each protocol
-class Protocol {
-
-public:
-
-    char name [10];
-    char layer [15];
-    int probability = 0; // percentage probability of this protocol 
-    vector <Property> properties;
-};
-
-// bara in 2 ta class vaght nashod ba getter , setter car konim, dang o fang dare stringash...
 
 
 // list of all enable protocols to check each packet with them
@@ -256,50 +235,49 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         const u_char *check;
 
         //if (protocol.layer == "internet"){
-		if (strcmp(protocol.layer , "internet") == 0){
+		if (strcmp(protocol.getLayer() , "internet") == 0){
         	check = packet_body;
 		
-		}else if (strcmp(protocol.layer , "transport") == 0){
+		}else if (strcmp(protocol.getLayer() , "transport") == 0){
         //}else if (protocol.layer == "transport"){
             check = ip_header;
 
-        }else if (strcmp(protocol.layer , "application") == 0)
+        }else if (strcmp(protocol.getLayer() , "application") == 0)
 			printf("comming soon...");
 
 
         // check all property and its constraint of protocol
-        for (Property property : protocol.properties) {
+        for (Property property : protocol.getProperties()) {
 
 			// check packet size
-	        if (property.constraint == -2){
+	        if (property.getConstraint() == -2){
 
 				// calculate size from specified bytes of packet
-				int calculated_size = (*(check + property.start_byte - 1)) * 256 + (*(check + property.end_byte - 1)) + 14; 
+				int calculated_size = (*(check + property.getStart_byte() - 1)) * 256 + (*(check + property.getEnd_byte() - 1)) + 14; 
 				int structure_size = packet_header->len;
 				
-				if (calculated_size == structure_size){
-					protocol.probability += property.probability_change;
-				}
+				if (calculated_size == structure_size)
+					protocol.increaseProbability (property.getProbability_change());
 			}
              
 			// for now we just check one byte and also two bytes of size
-            if (property.start_byte == property.end_byte)
-  				if (property.constraint == *(check + property.start_byte - 1))
-                    protocol.probability += property.probability_change;
+            if (property.getStart_byte() == property.getEnd_byte())
+  				if (property.getConstraint() == *(check + property.getStart_byte() - 1))
+                    protocol.increaseProbability (property.getProbability_change());
 
         }
   
-    	sprintf(logBuffer, "%11s: %%%d", protocol.name, protocol.probability);
+    	sprintf(logBuffer, "%11s: %%%d", protocol.getName(), protocol.getProbability());
         logger.log(logBuffer, "info");
 			
 		
 		// save protocol with more probability between tcp or udp, (considered that we always check tcp first)
 		int tcp_probability = 0;
-		if ((strcmp(protocol.name , "tcp") == 0) && (protocol.probability >= 50)){
-			tcp_probability = protocol.probability;
+		if ((strcmp(protocol.getName() , "tcp") == 0) && (protocol.getProbability() >= 50)){
+			tcp_probability = protocol.getProbability();
 			tcpORudp = 1;		
-		}else if ((strcmp(protocol.name , "udp") == 0) && (protocol.probability >= 50))
-			if (protocol.probability > tcp_probability)
+		}else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
+			if (protocol.getProbability() > tcp_probability)
 				tcpORudp = 2;
 
     }
@@ -343,20 +321,20 @@ void json_parse_config (json_object * jobj) {
 
         string keylid = key;
 
-	// fill protocols list
-	if (keylid == "protocol_list"){
+        // fill protocols list
+        if (keylid == "protocol_list"){
 
-        json_object *jarray = jobj;
-        jarray = json_object_object_get(jobj, key);
+            json_object *jarray = jobj;
+            jarray = json_object_object_get(jobj, key);
 
-		int arraylen = json_object_array_length(jarray);
-        json_object *jvalue;
+            int arraylen = json_object_array_length(jarray);
+            json_object *jvalue;
 
-		for (int i=0; i< arraylen; i++){
-			jvalue = json_object_array_get_idx(jarray, i);
+            for (int i=0; i< arraylen; i++){
+                jvalue = json_object_array_get_idx(jarray, i);
 
-        	sprintf(protocol_list[i], "%s", json_object_get_string(jvalue));			
-		}
+                sprintf(protocol_list[i], "%s", json_object_get_string(jvalue));			
+            }
 
 
         // if key stars with "protocol_" means that is related to a protocol
@@ -376,8 +354,7 @@ void json_parse_config (json_object * jobj) {
 
 				// save protocol name 
 				static int i = 0;
-				sprintf(prot.name, "%s", protocol_list[i++]);
-	
+                prot.setName(protocol_list[i++]);
 
                 char buffer[512] = "";
                 FILE *fp;
@@ -400,17 +377,17 @@ void json_parse_config (json_object * jobj) {
 		                jarray = json_object_object_get(jobj, key);
 
 		                json_object *jvalue;
-		                prop.start_byte = json_object_get_int( json_object_array_get_idx(jarray, 0));
-		                prop.end_byte = json_object_get_int( json_object_array_get_idx(jarray, 1));
-		                prop.constraint = json_object_get_int( json_object_array_get_idx(jarray, 2));
-		                prop.probability_change = json_object_get_int( json_object_array_get_idx(jarray, 3));
+		                prop.setStart_byte (json_object_get_int( json_object_array_get_idx(jarray, 0)));
+		                prop.setEnd_byte (json_object_get_int( json_object_array_get_idx(jarray, 1)));
+		                prop.setConstraint (json_object_get_int( json_object_array_get_idx(jarray, 2)));
+		                prop.setProbability_change (json_object_get_int( json_object_array_get_idx(jarray, 3)));
 
 		                // add each property to property list of protocol
-		                prot.properties.push_back(prop);
+                        prot.addProperty(prop);
 
 		            }else{
 		                //if (key == "layer")
-						sprintf(prot.layer, "%s", json_object_get_string(val));
+                        prot.setLayer(json_object_get_string(val));
 		            }
 
                 }
@@ -434,21 +411,17 @@ struct device select_device(int device_num){
 
     //get the list of available devices
     printf("Finding available devices ... ");
-    if( pcap_findalldevs( &alldevsp , errbuf) )
-    {
-        //printf("Error finding devices : %s" , errbuf);
+    if (pcap_findalldevs (&alldevsp, errbuf)) {
         logger.log("Error finding devices", "error");
         exit(1);
     }
     printf("Done");
 
     //Print the available devices
-    printf("\n\nAvailable Devices are :\n");
-    for(device = alldevsp ; device != NULL ; device = device->next)
-    {
+    printf ("\n\nAvailable Devices are :\n");
+    for (device = alldevsp ; device != NULL ; device = device->next) {
         printf("%d. %s - %s\n" , count , device->name , device->description);
-        if(device->name != NULL)
-        {
+        if (device->name != NULL) {
             // save device name
             strcpy(devices[count].name , device->name);
 
@@ -656,4 +629,3 @@ int main() {
     closelog();
     return 0;
 }
-
