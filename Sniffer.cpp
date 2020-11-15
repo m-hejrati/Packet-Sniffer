@@ -158,6 +158,9 @@ void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
 // separate useful part of tcp packet
 void Processing_tcp_packet(const u_char * Buffer, int Size) {
     
+    // trace
+    logger.log("packet considered as tcp", "trace");
+
     unsigned short iphdrlen;
 	
 	struct iphdr *iph = (struct iphdr *)( Buffer  + sizeof(struct ethhdr) );
@@ -188,6 +191,9 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 // separate useful part of udp packet
 void Processing_udp_packet(const u_char * Buffer, int Size){
 
+    // trace
+    logger.log("packet considered as udp", "trace");
+
 	unsigned short iphdrlen;
 	
 	struct iphdr *iph = (struct iphdr *)(Buffer +  sizeof(struct ethhdr));
@@ -217,6 +223,9 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 // the major part of the program that gets a packet and extract important data of it
 void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body) {
 
+    // trace
+    logger.log("new packet captured", "trace");
+
     // Pointers to start point of header.
     const u_char *ip_header;
 
@@ -236,6 +245,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
     //check each protocol
     for (Protocol protocol : protocols) {
+
+        // trace
+        sprintf(logBuffer, "check packet structure with %s protocol", protocol.getName());
+        logger.log(logBuffer, "trace");
 
         const u_char *check;
 
@@ -281,12 +294,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		if ((strcmp(protocol.getName() , "tcp") == 0) && (protocol.getProbability() >= 50)){
 			tcp_probability = protocol.getProbability();
 			tcpORudp = 1;
-            tcp_number ++;
 
 		}else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
 			if (protocol.getProbability() > tcp_probability){
 				tcpORudp = 2;
-                udp_number ++;
             }
 
         // increase number pf packet
@@ -299,11 +310,13 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
     // print important data of packet
     int size = packet_header->len;
-    if (tcpORudp == 1)
+    if (tcpORudp == 1){
         Processing_tcp_packet(packet_body , size);
-    else if (tcpORudp == 2)
-        Processing_tcp_packet(packet_body , size);
-			
+        tcp_number ++;
+    }else if (tcpORudp == 2){
+        Processing_udp_packet(packet_body , size);
+        udp_number ++;
+    }
 
     // debug
     sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));
@@ -524,6 +537,9 @@ void sig_handler(int signum){
 	ipv4_number = 0;
 	ipv6_number = 0;
 
+
+    // show all saved log in last period of time again. (dar halat aadi log haye paiin tar az info ro neshoon nemide)
+    // all: trace, debug, info, ... 
     if (logger.getConfigType() == "debug" || logger.getConfigType() == "trace")
         spdlog::dump_backtrace();
 
@@ -664,3 +680,4 @@ int main() {
     closelog();
     return 0;
 }
+
