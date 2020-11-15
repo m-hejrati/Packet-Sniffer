@@ -25,27 +25,69 @@ Logger::Logger(string typ){
 }
 
 // get message and log with choose level
-// and log if selected level in config file is the same as log
+// log all the message with the same and also higher priority than what saved in config file
 void Logger::log(string message, string logType){
 
-    if (configType == "debug" && logType == "debug"){
+    //spdlog::dump_backtrace(); // write this line when ever want to see dubug logs
 
-        spdlog::debug(message);
-        //spdlog::dump_backtrace(); // write this line when ever want to see dubug logs
+    if (configType == "trace"){
+        
+        if (logType == "trace")
+            spdlog::trace(message);
+        else if (logType == "debug")
+            spdlog::debug(message);
+        else if (logType == "info")
+            spdlog::info(message);
+        else if (logType == "warn")
+            spdlog::warn(message);              
+        else if (logType == "error")
+            spdlog::error(message);
+        else if (logType == "critical")
+            spdlog::critical(message); 
 
-    }else if (configType == "info" && logType == "info")
+    } else if (configType == "debug"){
 
-        spdlog::info(message);
+        if (logType == "debug")
+            spdlog::debug(message);
+        else if (logType == "info")
+            spdlog::info(message);
+        else if (logType == "warn")
+            spdlog::warn(message);              
+        else if (logType == "error")
+            spdlog::error(message);
+        else if (logType == "critical")
+            spdlog::critical(message); 
 
-    else if (configType == "warn" && logType == "warn")
+    }else if (configType == "info"){
 
-        spdlog::warn(message);
+        if (logType == "info")
+            spdlog::info(message);
+        else if (logType == "warn")
+            spdlog::warn(message);              
+        else if (logType == "error")
+            spdlog::error(message);
+        else if (logType == "critical")
+            spdlog::critical(message); 
 
-    else if (configType == "error" && logType == "error")
+    }else if (configType == "warn"){
 
-        spdlog::error(message);
+        if (logType == "warn")
+            spdlog::warn(message);              
+        else if (logType == "error")
+            spdlog::error(message);
+        else if (logType == "critical")
+            spdlog::critical(message); 
 
-    else if (configType == "critical" && logType == "critical")
+    }else if (configType == "error"){
 
-        spdlog::critical(message);
+        if (logType == "error")
+            spdlog::error(message);
+        else if (logType == "critical")
+            spdlog::critical(message); 
+
+    }else if (configType == "critical"){
+
+        if (logType == "critical")
+            spdlog::critical(message); 
+    }
 }

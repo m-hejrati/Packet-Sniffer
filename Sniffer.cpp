@@ -38,7 +38,8 @@ vector <Protocol> protocols;
 
 
 // create global logger object to use it all over the program
-Logger logger("0");
+// set default log level to info, until reading config file
+Logger logger("info");
 
 
 // create a buffer to make log with it using sprintf
@@ -53,8 +54,12 @@ struct device {
 };
 
 
-// number of captured packet
+// number of captured packets
 int packet_number = 0;
+int tcp_number = 0;
+int udp_number = 0;
+int ipv4_number = 0;
+int ipv6_number = 0;
 
 
 // an struct to hold source and destination of a packet 
@@ -275,19 +280,29 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 		int tcp_probability = 0;
 		if ((strcmp(protocol.getName() , "tcp") == 0) && (protocol.getProbability() >= 50)){
 			tcp_probability = protocol.getProbability();
-			tcpORudp = 1;		
+			tcpORudp = 1;
+            tcp_number ++;
+
 		}else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
-			if (protocol.getProbability() > tcp_probability)
+			if (protocol.getProbability() > tcp_probability){
 				tcpORudp = 2;
+                udp_number ++;
+            }
+
+        // increase number pf packet
+        if ((strcmp(protocol.getName() , "ipv4") == 0) && (protocol.getProbability() >= 50))
+            ipv4_number ++;
+        if ((strcmp(protocol.getName() , "ipv6") == 0) && (protocol.getProbability() >= 50))
+            ipv6_number ++;
 
     }
 
-		// print important data of packet
-		int size = packet_header->len;
-		if (tcpORudp == 1)
-			Processing_tcp_packet(packet_body , size);
-		else if (tcpORudp == 2)
-			Processing_tcp_packet(packet_body , size);
+    // print important data of packet
+    int size = packet_header->len;
+    if (tcpORudp == 1)
+        Processing_tcp_packet(packet_body , size);
+    else if (tcpORudp == 2)
+        Processing_tcp_packet(packet_body , size);
 			
 
     // debug
@@ -410,17 +425,17 @@ struct device select_device(int device_num){
     int n;
 
     //get the list of available devices
-    printf("Finding available devices ... ");
+    //printf("Finding available devices ... ");
     if (pcap_findalldevs (&alldevsp, errbuf)) {
         logger.log("Error finding devices", "error");
         exit(1);
     }
-    printf("Done");
+    //printf("Done");
 
     //Print the available devices
-    printf ("\n\nAvailable Devices are :\n");
+    //printf ("\n\nAvailable Devices are :\n");
     for (device = alldevsp ; device != NULL ; device = device->next) {
-        printf("%d. %s - %s\n" , count , device->name , device->description);
+        //printf("%d. %s - %s\n" , count , device->name , device->description);
         if (device->name != NULL) {
             // save device name
             strcpy(devices[count].name , device->name);
@@ -437,7 +452,7 @@ struct device select_device(int device_num){
     }
 
 
-    printf("\nNumber of device you want to sniff : %d", device_num);
+    //printf("\nNumber of device you want to sniff : %d", device_num);
 
     // copy and return selected device
     struct device selected_device;
@@ -488,13 +503,28 @@ void sig_handler(int signum){
 
     pcap_breakloop(handle);
 
+    // print number of captured packtet and its protocol
+    // this part should rewrite whenever new protocol add to program
     logger.log(" ", "info");
     sprintf(logBuffer, "number of packets in last %d seconds: %d", capture_time, packet_number);
-    logger.log(logBuffer, "info");
+	logger.log(logBuffer, "info");
+    sprintf(logBuffer, "        tcp: %d", tcp_number);
+	logger.log(logBuffer, "info");
+	sprintf(logBuffer, "        udp: %d", udp_number);
+	logger.log(logBuffer, "info");
+ 	sprintf(logBuffer, "       IPv4: %d", ipv4_number);
+	logger.log(logBuffer, "info");
+	sprintf(logBuffer, "       IPv6: %d", ipv6_number);
+	logger.log(logBuffer, "info");
+    logger.log(" ", "info");
 
-    packet_number = 0;
+	packet_number = 0;
+	tcp_number = 0;
+	udp_number = 0;
+	ipv4_number = 0;
+	ipv6_number = 0;
 
-    if (logger.getConfigType() == "debug")
+    if (logger.getConfigType() == "debug" || logger.getConfigType() == "trace")
         spdlog::dump_backtrace();
 
 }
@@ -504,8 +534,9 @@ void sig_handler(int signum){
 // the main function
 int main() {
 
-    printf("Packet Sniffer\n");
-    printf("Mahdi Hejrati\n\n");
+    logger.log("      \"Packet Sniffer\"", "info");
+    logger.log("       \"Mahdi Hejrati\"", "info");
+
 
     struct device device; // device to sniff on
     //char error_buffer[PCAP_ERRBUF_SIZE]; // error string ?
@@ -555,7 +586,7 @@ int main() {
     logger.setConfigType(log_type);
 
 
-    // make object of "enable" protocol to analyze it
+    // read all config files and make object of "enable" protocols to analyze it
     json_object * json_config = json_tokener_parse(buffer);
     json_parse_config(json_config);
 
@@ -564,11 +595,8 @@ int main() {
     device = select_device(device_num);
 
     // ask pcap for the network address and mask of the device
-    if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1){
-
-        //printf("Couldn't read device %s information - %s\n", device.name, error_buffer);
+    if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1)
         logger.log("Couldn't read selected device information", "error");
-    }
 
     // get the subnet mask in a human readable form
     addr.s_addr = raw_mask;
@@ -577,13 +605,18 @@ int main() {
     addres_class = addres_class_detection (device.ip);
 
     // print device information
-    printf("\nDevice info\n");
-    printf("Name: %s\n", device.name);
-    printf("IP: %s\n", device.ip);
-    printf("Mask: %s\n" , mask);
-    printf("Class: %c\n", addres_class);
+    logger.log(" ", "info");
+    logger.log("       Device info", "info");
+    sprintf(logBuffer, "        Name: %s", device.name);
+    logger.log(logBuffer, "info");
+    sprintf(logBuffer, "          IP: %s", device.ip);
+    logger.log(logBuffer, "info");
+    sprintf(logBuffer, "        Mask: %s" , mask);
+    logger.log(logBuffer, "info");
+    sprintf(logBuffer, "       Class: %c", addres_class);
+    logger.log(logBuffer, "info");
 
-    printf("\nNumber of packets you want to capture: %d", num_packets);
+    //printf("\nNumber of packets you want to capture: %d", num_packets);
 
     // open device in promiscuous mode
     handle = pcap_open_live(device.name, BUFSIZ, 1, 0, error_buffer);
@@ -604,8 +637,10 @@ int main() {
     }
 
     // print capture info
-    printf("\n\nStart sniffing...\n");
-    printf("period time: %d\n\n", capture_time);
+    logger.log(" ", "info");
+    logger.log(" Start sniffing...", "info");
+    sprintf(logBuffer, " period time: %d second", capture_time);
+    logger.log(logBuffer, "info");
 
 
     while (1) {
