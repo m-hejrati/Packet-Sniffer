@@ -1,10 +1,7 @@
 // include dependent classes
 #include "Logger.h"
-#include "Logger.cpp" // ?
 #include "Property.h"
-#include "Property.cpp" // ?
 #include "Protocol.h"
-#include "Protocol.cpp" // ?
 
 
 #include <locale>
@@ -668,6 +665,7 @@ int main() {
 
         // start sniffing
         pcap_loop(handle, num_packets, packet_handler, NULL);
+        
 
     }
 

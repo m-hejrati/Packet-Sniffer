@@ -21,7 +21,7 @@ string Logger::getConfigType() {
 // constructor of Logger class
 Logger::Logger(string typ){
     configType = typ;
-    spdlog::enable_backtrace(64);
+    spdlog::enable_backtrace(8192);
 }
 
 // get message and log with choose level
@@ -90,4 +90,8 @@ void Logger::log(string message, string logType){
         if (logType == "critical")
             spdlog::critical(message); 
     }
+
+    // // enable this feature to show trace and debug log in program
+    // if (configType == "debug" || configType == "trace")
+    //     spdlog::dump_backtrace();
 }
