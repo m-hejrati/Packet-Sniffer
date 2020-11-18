@@ -13,4 +13,4 @@ Property.o: Property.cpp Property.h
 Protocol.o: Protocol.cpp Protocol.h
 	$(CXX) $(CXXFLAGS) Protocol.cpp
 main.o: main.cpp
-	$(CXX) $(CXXFLAGS) main.cpp 
+	$(CXX) $(CXXFLAGS) main.cpp -lpcap -ljson-c -I "spdlog/include"

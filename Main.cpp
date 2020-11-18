@@ -40,7 +40,7 @@ Logger logger("info");
 
 
 // create a buffer to make log with it using sprintf
-char logBuffer [50];
+char logBuffer [64];
 
 
 // an struct to hold name and ip of packets
@@ -94,18 +94,6 @@ char* find_printable_payload(const u_char *payload, int len){
 }
 
 
-// print useful data of ip header
-void print_ip_header(int Size, struct IP ip) {
-	
-    sprintf(logBuffer, "Packet size: %d bytes", Size);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "     Src IP: %s", ip.src);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "     Dst IP: %s", ip.dst);
-	logger.log(logBuffer, "info");
-}
-
-
 // separate useful part of ip header
 struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 
@@ -131,27 +119,6 @@ struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 }
 
 
-// print useful data of tcp header
-void print_tcp_header(const u_char * Buffer, int Size, struct tcphdr *tcph) {
-
-    sprintf(logBuffer, "   Src port: %d", ntohs(tcph->source));
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Dst port: %d", ntohs(tcph->dest));
-	logger.log(logBuffer, "info");
-}
-
-
-// print useful data of udp header
-void print_udp_header(const u_char *Buffer , int Size, struct udphdr *udph){
-
-    sprintf(logBuffer, "   Src port: %d", ntohs(udph->source));
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "   Dst port: %d", ntohs(udph->dest));
-	logger.log(logBuffer, "info");
-		
-}
-
-
 // separate useful part of tcp packet
 void Processing_tcp_packet(const u_char * Buffer, int Size) {
     
@@ -167,18 +134,16 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 			
 	int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
 
-
     // get printable part of payload
     char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
-
-    //sprintf(logBuffer, "   Protocol: TCP");
-	//logger.log(logBuffer, "info");
 	
-	print_ip_header(Size, ip);
-    print_tcp_header(Buffer, Size, tcph);
+    // print useful data of tcp header
+    char logBuffer [256];
+    sprintf(logBuffer, "Size: %4d bytes,   Src IP: %15s,   Dst IP: %15s,   Src port: %5d,   Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));
+	logger.log(logBuffer, "info");
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
@@ -205,12 +170,11 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
-
-    //sprintf(logBuffer, "   Protocol: UDP");
-	//logger.log(logBuffer, "info");
 	
-	print_ip_header(Size, ip);
-	print_udp_header(Buffer , Size, udph);
+    // print useful data of tcp header
+    char logBuffer [256];
+    sprintf(logBuffer, "Size: %4d bytes,   Src IP: %15s,   Dst IP: %15s,   Src port: %5d,   Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
+	logger.log(logBuffer, "info");
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
@@ -231,7 +195,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
     //start of IP header
     ip_header = packet_body + ethernet_header_length;
-
 
     logger.log(" ", "info");
     sprintf(logBuffer, "     number: %d", ++packet_number);
@@ -293,9 +256,8 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 			tcpORudp = 1;
 
 		}else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
-			if (protocol.getProbability() > tcp_probability){
+			if (protocol.getProbability() > tcp_probability)
 				tcpORudp = 2;
-            }
 
         // increase number pf packet
         if ((strcmp(protocol.getName() , "ipv4") == 0) && (protocol.getProbability() >= 50))
@@ -328,7 +290,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     //debug
     sprintf(logBuffer, "byte_size: %d \t %d ", *(ip_header + 2), *(ip_header + 3));
     logger.log(logBuffer, "debug");
-
 }
 
 
@@ -432,7 +393,7 @@ struct device select_device(int device_num){
     struct device devices [20];
     char *errbuf;
     int count = 1;
-    int n;
+    //int n;
 
     //get the list of available devices
     //printf("Finding available devices ... ");
@@ -678,4 +639,3 @@ int main() {
     closelog();
     return 0;
 }
-
