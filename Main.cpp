@@ -98,10 +98,8 @@ char* find_printable_payload(const u_char *payload, int len){
 struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 
 	struct sockaddr_in source,dest;
-	unsigned short iphdrlen;
 		
 	struct iphdr *iph = (struct iphdr *)(Buffer  + sizeof(struct ethhdr) );
-	iphdrlen =iph->ihl*4;
 	
 	// get source IP address
     memset(&source, 0, sizeof(source));
@@ -132,10 +130,10 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 	
 	struct tcphdr *tcph=(struct tcphdr*)(Buffer + iphdrlen + sizeof(struct ethhdr));
 			
-	int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
+	//int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
 
     // get printable part of payload
-    char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
+    //char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
@@ -163,10 +161,10 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 	
 	struct udphdr *udph = (struct udphdr*)(Buffer + iphdrlen  + sizeof(struct ethhdr));
 	
-	int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
+	//int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
 
 	// get printable part of payload
-	char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
+	//char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
@@ -302,15 +300,13 @@ void json_parse_config (json_object * jobj) {
 
     // check all the key/value of config file
     json_object_object_foreach(jobj, key, val) {
-        enum json_type type;
-        type = json_object_get_type(val);
 
         string keylid = key;
 
         // fill protocols list
         if (keylid == "protocol_list"){
 
-            json_object *jarray = jobj;
+            json_object *jarray;
             jarray = json_object_object_get(jobj, key);
 
             int arraylen = json_object_array_length(jarray);
@@ -345,6 +341,10 @@ void json_parse_config (json_object * jobj) {
                 char buffer[512] = "";
                 FILE *fp;
                 fp = fopen(value, "r");
+                if (fp == NULL){
+                    logger.log("Error in opening config file", "error");
+                    return;
+                }
                 fread(buffer, 512, 1, fp);
                 fclose(fp);
 
@@ -359,10 +359,9 @@ void json_parse_config (json_object * jobj) {
 
 		                Property prop;
 
-		                json_object *jarray = jobj;
+		                json_object *jarray;
 		                jarray = json_object_object_get(jobj, key);
 
-		                json_object *jvalue;
 		                prop.setStart_byte (json_object_get_int( json_object_array_get_idx(jarray, 0)));
 		                prop.setEnd_byte (json_object_get_int( json_object_array_get_idx(jarray, 1)));
 		                prop.setConstraint (json_object_get_int( json_object_array_get_idx(jarray, 2)));
@@ -391,7 +390,7 @@ struct device select_device(int device_num){
     pcap_if_t *alldevsp , *device;
     //char devs[100][100];
     struct device devices [20];
-    char *errbuf;
+    char *errbuf = NULL;
     int count = 1;
     //int n;
 
@@ -458,6 +457,8 @@ char addres_class_detection(char ip_reference [20]){
         return 'D';
     else if (240 <= class_add && class_add <= 247)
         return 'E';
+    else 
+        return '-';
 }
 
 
@@ -522,40 +523,71 @@ int main() {
     struct in_addr addr;
     char *mask; // dot notation of the network mask
     char addres_class; // ip address class between A, B, C, ...
-    struct pcap_pkthdr header; //header that pcap gives us
-    const u_char *packet; // actual packet
+    //struct pcap_pkthdr header; //header that pcap gives us
+    //const u_char *packet; // actual packet
 
 
     // read config file once and then make objects
     char buffer [512] = "";
     FILE *fp;
     fp = fopen ("config/config.json", "r");
+    if (fp == NULL){
+        logger.log("Error in opening config file", "error");
+        return 1;
+    }
     fread (buffer, 512, 1, fp);
     fclose (fp);
 
 
     // declare struct to read json
     struct json_object *parsed_json;
-    struct json_object *json_device;
-    struct json_object *json_number;
-    struct json_object *json_time;
-    struct json_object *json_log;
-
     parsed_json = json_tokener_parse(buffer);
 
-    json_object_object_get_ex (parsed_json, "json_device", &json_device);
-    json_object_object_get_ex (parsed_json, "json_number", &json_number);
-    json_object_object_get_ex (parsed_json, "json_time", &json_time);
-    json_object_object_get_ex (parsed_json, "json_log", &json_log);
 
+    // read device number
+    struct json_object *json_device; // struct to read json
     int device_num; // device number to capture
-    device_num = json_object_get_int(json_device);
-    int num_packets; // number of packets to capture
-    num_packets = json_object_get_int(json_number);
-    capture_time = json_object_get_int(json_time);
-    string log_type; // log level
-    log_type = json_object_get_string(json_log);
+    json_object_object_get_ex (parsed_json, "json_device", &json_device);
+    if (json_device == NULL){
+        logger.log("Couldn't read device number from config,   default device : 1", "warn");
+        device_num = 1;
+    }else{
+        device_num = json_object_get_int(json_device);
+    }
+    // select device
+    device = select_device(device_num);
 
+    // read number of packets
+    struct json_object *json_number; // struct to read json
+    int num_packets; // number of packets to capture
+    json_object_object_get_ex (parsed_json, "json_number", &json_number);
+    if (json_number == NULL){
+        logger.log("Couldn't read number of packets from config,   default number : 100", "warn");
+        num_packets = 100;
+    }else{
+        num_packets = json_object_get_int(json_number);
+    }
+
+    // read each capture time period
+    struct json_object *json_time; // struct to read json
+    json_object_object_get_ex (parsed_json, "json_time", &json_time);
+    if (json_time == NULL){
+        logger.log("Couldn't read each capture time period from config,   default time : 10 s", "warn");
+        capture_time = 10;
+    }else{
+        capture_time = json_object_get_int(json_time);
+    }
+
+    // read log level
+    struct json_object *json_log; // struct to read json
+    string log_type; // log level
+    json_object_object_get_ex (parsed_json, "json_log", &json_log);
+    if (json_log == NULL){
+        logger.log("Couldn't read log level from config,   default level : info", "warn");
+        log_type = "info";
+    }else{
+        log_type = json_object_get_string(json_log);
+    }
     // set log level
     logger.setConfigType(log_type);
 
@@ -564,9 +596,6 @@ int main() {
     json_object * json_config = json_tokener_parse(buffer);
     json_parse_config(json_config);
 
-
-    // select device
-    device = select_device(device_num);
 
     // ask pcap for the network address and mask of the device
     if( pcap_lookupnet(device.name, &ip, &raw_mask, error_buffer) == -1)
@@ -626,7 +655,6 @@ int main() {
 
         // start sniffing
         pcap_loop(handle, num_packets, packet_handler, NULL);
-        
 
     }
 
