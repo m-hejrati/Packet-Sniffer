@@ -140,7 +140,7 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 	
     // print useful data of tcp header
     char logBuffer [256];
-    sprintf(logBuffer, "Size: %4d bytes,   Src IP: %15s,   Dst IP: %15s,   Src port: %5d,   Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));
+    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));
 	logger.log(logBuffer, "info");
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
@@ -169,9 +169,9 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
-    // print useful data of tcp header
+    // print useful data of udp header
     char logBuffer [256];
-    sprintf(logBuffer, "Size: %4d bytes,   Src IP: %15s,   Dst IP: %15s,   Src port: %5d,   Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
+    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
 	logger.log(logBuffer, "info");
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
@@ -194,12 +194,19 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     //start of IP header
     ip_header = packet_body + ethernet_header_length;
 
-    logger.log(" ", "info");
-    sprintf(logBuffer, "     number: %d", ++packet_number);
-    logger.log(logBuffer, "info");
+    // logger.log(" ", "info");
+    // sprintf(logBuffer, "     number: %d", ++packet_number);
+    // logger.log(logBuffer, "info");
 
 	// select between tcp or udp for printing data
 	int tcpORudp = 0;	
+
+
+    // make an string to print probability of each protocol
+    logger.log(" ", "info");
+    char probabilitiesBuffer [256] = "#";
+    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%03d =>", ++packet_number);
+
 
     //check each protocol
     for (Protocol protocol : protocols) {
@@ -242,10 +249,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                     protocol.increaseProbability (property.getProbability_change());
 
         }
-  
-    	sprintf(logBuffer, "%11s: %%%d", protocol.getName(), protocol.getProbability());
-        logger.log(logBuffer, "info");
-			
 		
 		// save protocol with more probability between tcp or udp, (considered that we always check tcp first)
 		int tcp_probability = 0;
@@ -263,7 +266,11 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         if ((strcmp(protocol.getName() , "ipv6") == 0) && (protocol.getProbability() >= 50))
             ipv6_number ++;
 
+        // save all probabilities
+        sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
     }
+    logger.log(probabilitiesBuffer, "info");
+
 
     // print important data of packet
     int size = packet_header->len;
@@ -478,17 +485,11 @@ void sig_handler(int signum){
     // print number of captured packtet and its protocol
     // this part should rewrite whenever new protocol add to program
     logger.log(" ", "info");
-    sprintf(logBuffer, "number of packets in last %d seconds: %d", capture_time, packet_number);
-	logger.log(logBuffer, "info");
-    sprintf(logBuffer, "        tcp: %d", tcp_number);
-	logger.log(logBuffer, "info");
-	sprintf(logBuffer, "        udp: %d", udp_number);
-	logger.log(logBuffer, "info");
- 	sprintf(logBuffer, "       IPv4: %d", ipv4_number);
-	logger.log(logBuffer, "info");
-	sprintf(logBuffer, "       IPv6: %d", ipv6_number);
-	logger.log(logBuffer, "info");
-    logger.log(" ", "info");
+    char buffer[256];
+    sprintf(buffer, "number of packets in last %d seconds: %d", capture_time, packet_number);
+    logger.log(buffer, "info");
+    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d", tcp_number, udp_number, ipv4_number, ipv6_number), 
+    logger.log(buffer, "info");
 
 	packet_number = 0;
 	tcp_number = 0;
