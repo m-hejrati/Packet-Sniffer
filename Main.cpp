@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "Property.h"
 #include "Protocol.h"
+#include "Session.h"
 
 
 #include <locale>
@@ -203,7 +204,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 
     // make an string to print probability of each protocol
-    logger.log(" ", "info");
     char probabilitiesBuffer [256] = "#";
     sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%03d =>", ++packet_number);
 
