@@ -34,6 +34,8 @@ using namespace std;
 // list of all enable protocols to check each packet with them
 vector <Protocol> protocols;
 
+// list of all open sessions
+vector <Session> sessions;
 
 // create global logger object to use it all over the program
 // set default log level to info, until reading config file
@@ -65,6 +67,16 @@ struct IP {
 
 	char src [16];
 	char dst [16];
+};
+
+//
+struct fiveTuple {
+
+    string type;
+    string srcIP;
+    string dstIP;
+    char * scrPort;
+    char * dstPort;
 };
 
 
@@ -119,7 +131,7 @@ struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 
 
 // separate useful part of tcp packet
-void Processing_tcp_packet(const u_char * Buffer, int Size) {
+struct fiveTuple Processing_tcp_packet(const u_char * Buffer, int Size) {
     
     // trace
     logger.log("packet considered as tcp", "trace");
@@ -146,11 +158,19 @@ void Processing_tcp_packet(const u_char * Buffer, int Size) {
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
+
+    // use two buffer to convert from uint16 to string
+    char buf1 [10];
+    sprintf(buf1, "%d", ntohs(tcph->source));
+    char buf2 [10];
+    sprintf(buf2, "%d", ntohs(tcph->dest));
+    struct fiveTuple fiveTuple = {"tcp", ip.src, ip.dst, buf1, buf2};
+    return fiveTuple;
 }
 
 
 // separate useful part of udp packet
-void Processing_udp_packet(const u_char * Buffer, int Size){
+struct fiveTuple Processing_udp_packet(const u_char * Buffer, int Size){
 
     // trace
     logger.log("packet considered as udp", "trace");
@@ -177,6 +197,14 @@ void Processing_udp_packet(const u_char * Buffer, int Size){
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
+
+    // use two buffer to convert from uint16 to string
+    char buf1 [10];
+    sprintf(buf1, "%d", ntohs(udph->source));
+    char buf2 [10];
+    sprintf(buf2, "%d", ntohs(udph->dest));
+    struct fiveTuple fiveTuple = {"udp", ip.src, ip.dst, buf1, buf2};
+    return fiveTuple;    
 }
 
 
@@ -272,15 +300,37 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     logger.log(probabilitiesBuffer, "info");
 
 
+    struct fiveTuple fiveTuple;
+
     // print important data of packet
     int size = packet_header->len;
     if (tcpORudp == 1){
-        Processing_tcp_packet(packet_body , size);
+        fiveTuple = Processing_tcp_packet(packet_body , size);
         tcp_number ++;
     }else if (tcpORudp == 2){
-        Processing_udp_packet(packet_body , size);
+        fiveTuple = Processing_udp_packet(packet_body , size);
         udp_number ++;
     }
+
+    // chaeck all previous saved session
+    bool newSessionFlag = true;
+    for (Session session : sessions)
+        if (session.checkSession(fiveTuple)){
+            session.increaseNumbers();
+            newSessionFlag = false;
+            continue;
+        }
+
+    // make new session if not exist
+    if (newSessionFlag){
+        Session newSession(fiveTuple.type, fiveTuple.srcIP, fiveTuple.dstIP, fiveTuple.scrPort, fiveTuple.dstPort);
+        sessions.push_back(newSession);
+    }    
+
+
+    // debug
+    sprintf(logBuffer, "srcPort %s\t dstPort %s", fiveTuple.dstPort, fiveTuple.scrPort);
+    logger.log(logBuffer, "debug");
 
     // debug
     sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));

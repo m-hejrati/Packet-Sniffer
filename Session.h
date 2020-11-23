@@ -18,24 +18,29 @@ private:
     string dstIP;
     string scrPort;
     string dstPort;
+    int numbers;
 
 public:
     
+    Session(string typ, string sIP, string dIP, string sPort, string dPort);
+
     // getter
-    string getType();
-    string getSrcIP();
-    string getDstIP();
-    string getSrcPort();
-    string getDstPort();
-    string getStatus();
+    // string getType();
+    // string getSrcIP();
+    // string getDstIP();
+    // string getSrcPort();
+    // string getDstPort();
+    // string getStatus();
+    // int getNumbers();
 
     // setter
-    void setType(string typ);
-    void setSrcIP(string src);
-    void setDstIP(string dst);
-    void setSrcPort(string src);
-    void setDstPort(string dst);
-    void setStatus(string st);
+    // void setType(string typ);
+    // void setSrcIP(string src);
+    // void setDstIP(string dst);
+    // void setSrcPort(string src);
+    // void setDstPort(string dst);
+    // void setStatus(string st);
+    void increaseNumbers();
 
 };
 
