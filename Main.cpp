@@ -69,7 +69,7 @@ struct IP {
 	char dst [16];
 };
 
-//
+// a five tuple to hold important data of session
 struct fiveTuple {
 
     string type;
@@ -131,7 +131,7 @@ struct IP Processing_ip_header(const u_char * Buffer, int Size) {
 
 
 // separate useful part of tcp packet
-struct fiveTuple Processing_tcp_packet(const u_char * Buffer, int Size) {
+Session Processing_tcp_packet(const u_char * Buffer, int Size) {
     
     // trace
     logger.log("packet considered as tcp", "trace");
@@ -151,26 +151,30 @@ struct fiveTuple Processing_tcp_packet(const u_char * Buffer, int Size) {
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
+
     // print useful data of tcp header
     char logBuffer [256];
-    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));
-	logger.log(logBuffer, "info");
+    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));	
+    logger.log(logBuffer, "info");
+
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
+
 
     // use two buffer to convert from uint16 to string
     char buf1 [10];
     sprintf(buf1, "%d", ntohs(tcph->source));
     char buf2 [10];
     sprintf(buf2, "%d", ntohs(tcph->dest));
-    struct fiveTuple fiveTuple = {"tcp", ip.src, ip.dst, buf1, buf2};
-    return fiveTuple;
+
+    Session newSession("tcp", ip.src, ip.dst, buf1, buf2);
+    return newSession;
 }
 
 
 // separate useful part of udp packet
-struct fiveTuple Processing_udp_packet(const u_char * Buffer, int Size){
+Session Processing_udp_packet(const u_char * Buffer, int Size){
 
     // trace
     logger.log("packet considered as udp", "trace");
@@ -190,21 +194,44 @@ struct fiveTuple Processing_udp_packet(const u_char * Buffer, int Size){
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
+
     // print useful data of udp header
     char logBuffer [256];
     sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
 	logger.log(logBuffer, "info");
 
+
     //sprintf(logBuffer, "    payload: %s", printable_payload);
 	//logger.log(logBuffer, "info");
+
 
     // use two buffer to convert from uint16 to string
     char buf1 [10];
     sprintf(buf1, "%d", ntohs(udph->source));
     char buf2 [10];
     sprintf(buf2, "%d", ntohs(udph->dest));
-    struct fiveTuple fiveTuple = {"udp", ip.src, ip.dst, buf1, buf2};
-    return fiveTuple;    
+    
+    Session newSession("udp", ip.src, ip.dst, buf1, buf2);
+    return newSession;    
+}
+
+
+// save sessions 
+void processing_session(Session newSession){
+
+    // check all previous saved session to find the same
+    bool newSessionFlag = true;
+    for (Session session : sessions)
+        if (session.checkSession(newSession)){
+            session.increaseNumbers();
+            newSessionFlag = false;
+            continue;
+        }
+
+    //make new session if not exist
+    if (newSessionFlag){
+        sessions.push_back(newSession);
+    } 
 }
 
 
@@ -300,37 +327,19 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     logger.log(probabilitiesBuffer, "info");
 
 
-    struct fiveTuple fiveTuple;
-
     // print important data of packet
     int size = packet_header->len;
     if (tcpORudp == 1){
-        fiveTuple = Processing_tcp_packet(packet_body , size);
+        Session newSession = Processing_tcp_packet(packet_body , size);
         tcp_number ++;
+        processing_session(newSession);
+
     }else if (tcpORudp == 2){
-        fiveTuple = Processing_udp_packet(packet_body , size);
+        Session newSession = Processing_udp_packet(packet_body , size);
         udp_number ++;
+        processing_session(newSession);
     }
 
-    // chaeck all previous saved session
-    bool newSessionFlag = true;
-    for (Session session : sessions)
-        if (session.checkSession(fiveTuple)){
-            session.increaseNumbers();
-            newSessionFlag = false;
-            continue;
-        }
-
-    // make new session if not exist
-    if (newSessionFlag){
-        Session newSession(fiveTuple.type, fiveTuple.srcIP, fiveTuple.dstIP, fiveTuple.scrPort, fiveTuple.dstPort);
-        sessions.push_back(newSession);
-    }    
-
-
-    // debug
-    sprintf(logBuffer, "srcPort %s\t dstPort %s", fiveTuple.dstPort, fiveTuple.scrPort);
-    logger.log(logBuffer, "debug");
 
     // debug
     sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));
@@ -536,7 +545,7 @@ void sig_handler(int signum){
     // this part should rewrite whenever new protocol add to program
     logger.log(" ", "info");
     char buffer[256];
-    sprintf(buffer, "number of packets in last %d seconds: %d", capture_time, packet_number);
+    sprintf(buffer, "Statistics of last %d seconds: packets: %d - sessions: %lu", capture_time, packet_number, sessions.size());
     logger.log(buffer, "info");
     sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d", tcp_number, udp_number, ipv4_number, ipv6_number), 
     logger.log(buffer, "info");
@@ -547,6 +556,7 @@ void sig_handler(int signum){
 	ipv4_number = 0;
 	ipv6_number = 0;
 
+    sessions.clear();
 
     // show all saved log in last period of time again. (dar halat aadi log haye paiin tar az info ro neshoon nemide)
     // all: trace, debug, info, ... 

@@ -1,9 +1,21 @@
 #include "Session.h"
 
+#include <iostream>
 #include <string>
 #include <string.h>
 
-using namespace std; 
+//using namespace std; 
+
+
+// // a five tuple to hold important data of session
+// struct fiveTuple {
+
+//     string type;
+//     string srcIP;
+//     string dstIP;
+//     char * scrPort;
+//     char * dstPort;
+// };
 
 
 string type;
@@ -13,6 +25,7 @@ string scrPort;
 string dstPort;
 string status;
 int numbers;
+
 
 // constructor of Logger class
 Session::Session(string typ, string sIP, string dIP, string sPort, string dPort){
@@ -26,25 +39,25 @@ Session::Session(string typ, string sIP, string dIP, string sPort, string dPort)
     numbers = 1;
 }
 
-// string Session::getType(){
-//     return type;
-// }
+string Session::getType(){
+    return type;
+}
 
-// string Session::getSrcIP(){
-//     return srcIP;
-// }
+string Session::getSrcIP(){
+    return srcIP;
+}
 
-// string Session::getDstIP(){
-//     return dstIP;
-// }
+string Session::getDstIP(){
+    return dstIP;
+}
 
-// string Session::getSrcPort(){
-//     return scrPort;
-// }
+string Session::getSrcPort(){
+    return scrPort;
+}
 
-// string Session::getDstPort(){
-//     return dstPort;
-// }
+string Session::getDstPort(){
+    return dstPort;
+}
 
 // string Session::getStatus(){
 //     return status;
@@ -82,3 +95,23 @@ void Session::increaseNumbers(){
     numbers ++;
 }
 
+bool Session::checkSession(Session newSession){
+		
+    if (type == newSession.getType()){
+
+        if ((srcIP == newSession.getSrcIP()) && (dstIP == newSession.getDstIP()) && (scrPort == newSession.getSrcPort()) && (dstPort == newSession.getDstPort()))
+            return true;
+
+        if ((srcIP == newSession.getDstIP()) && (dstIP == newSession.getSrcIP()) && (scrPort == newSession.getDstPort()) && (dstPort == newSession.getSrcPort()))
+            return true;
+
+    }else
+        return false;    
+}
+
+
+void Session::printInfo(){
+
+cout << type << srcIP << dstIP << scrPort << dstIP << "\n";
+
+}
