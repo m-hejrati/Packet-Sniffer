@@ -153,9 +153,9 @@ Session Processing_tcp_packet(const u_char * Buffer, int Size) {
 	
 
     // print useful data of tcp header
-    char logBuffer [256];
-    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));	
-    logger.log(logBuffer, "info");
+    // char logBuffer [256];
+    // sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));	
+    // logger.log(logBuffer, "info");
 
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
@@ -167,7 +167,6 @@ Session Processing_tcp_packet(const u_char * Buffer, int Size) {
     sprintf(buf1, "%d", ntohs(tcph->source));
     char buf2 [10];
     sprintf(buf2, "%d", ntohs(tcph->dest));
-
     Session newSession("tcp", ip.src, ip.dst, buf1, buf2);
     return newSession;
 }
@@ -196,9 +195,9 @@ Session Processing_udp_packet(const u_char * Buffer, int Size){
 	
 
     // print useful data of udp header
-    char logBuffer [256];
-    sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
-	logger.log(logBuffer, "info");
+    // char logBuffer [256];
+    // sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
+	// logger.log(logBuffer, "info");
 
 
     //sprintf(logBuffer, "    payload: %s", printable_payload);
@@ -210,7 +209,6 @@ Session Processing_udp_packet(const u_char * Buffer, int Size){
     sprintf(buf1, "%d", ntohs(udph->source));
     char buf2 [10];
     sprintf(buf2, "%d", ntohs(udph->dest));
-    
     Session newSession("udp", ip.src, ip.dst, buf1, buf2);
     return newSession;    
 }
@@ -235,6 +233,32 @@ void processing_session(Session newSession){
 }
 
 
+// check protocol properties
+void check_properties(Protocol &protocol, const u_char *check, const struct pcap_pkthdr *packet_header){
+
+    // check all property and its constraint of protocol
+    for (Property property : protocol.getProperties()) {
+
+        // check packet size
+        if (property.getConstraint() == -2){
+
+            // calculate size from specified bytes of packet
+            int calculated_size = (*(check + property.getStart_byte() - 1)) * 256 + (*(check + property.getEnd_byte() - 1)) + 14; 
+            int structure_size = packet_header->len;
+            
+            if (calculated_size == structure_size)
+                protocol.increaseProbability (property.getProbability_change());
+        }
+            
+        // for now we just check one byte and also two bytes of size
+        if (property.getStart_byte() == property.getEnd_byte())
+            if (property.getConstraint() == *(check + property.getStart_byte() - 1))
+                protocol.increaseProbability (property.getProbability_change());
+
+    }
+}
+
+
 // the major part of the program that gets a packet and extract important data of it
 void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body) {
 
@@ -254,14 +278,16 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     // sprintf(logBuffer, "     number: %d", ++packet_number);
     // logger.log(logBuffer, "info");
 
-	// select between tcp or udp for printing data
-	int tcpORudp = 0;	
-
 
     // make an string to print probability of each protocol
     char probabilitiesBuffer [256] = "#";
     sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%03d =>", ++packet_number);
 
+
+	// select between tcp or udp for printing data
+	int tcpORudp = 0;	
+    // a flag to show if we have application layer protocol or not 
+    bool applicationLayerflag = false;
 
     //check each protocol
     for (Protocol protocol : protocols) {
@@ -272,76 +298,110 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
         const u_char *check;
 
-        //if (protocol.layer == "internet"){
 		if (strcmp(protocol.getLayer() , "internet") == 0){
         	check = packet_body;
+
+            // check protocol properties
+            check_properties(protocol, check, packet_header);
+
+            //debug
+            sprintf(logBuffer, "layer = %s, name = %s, prob = %d\n", protocol.getLayer(), protocol.getName(), protocol.getProbability());
+            logger.log(logBuffer, "debug");
+
+            // increase number pf packet
+            if ((strcmp(protocol.getName() , "ipv4") == 0) && (protocol.getProbability() >= 50))
+                ipv4_number ++;
+            if ((strcmp(protocol.getName() , "ipv6") == 0) && (protocol.getProbability() >= 50))
+                ipv6_number ++;
 		
-		}else if (strcmp(protocol.getLayer() , "transport") == 0){
-        //}else if (protocol.layer == "transport"){
+            // save probabilities
+            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+		
+        }else if (strcmp(protocol.getLayer() , "transport") == 0){
             check = ip_header;
 
-        }else if (strcmp(protocol.getLayer() , "application") == 0)
-			printf("comming soon...");
+            // check protocol properties
+            check_properties(protocol, check, packet_header);
+
+            //debug
+            sprintf(logBuffer, "layer = %s, name = %s, prob = %d\n", protocol.getLayer(), protocol.getName(), protocol.getProbability());
+            logger.log(logBuffer, "debug");
 
 
-        // check all property and its constraint of protocol
-        for (Property property : protocol.getProperties()) {
+            // save protocol with more probability between tcp or udp, (considered that we always check tcp first)
+            int tcp_probability = 0;
+            if ((strcmp(protocol.getName() , "tcp") == 0) && (protocol.getProbability() >= 50)){
+                tcp_probability = protocol.getProbability();
+                tcpORudp = 1;
+            }else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
+                if (protocol.getProbability() > tcp_probability)
+                    tcpORudp = 2;
 
-			// check packet size
-	        if (property.getConstraint() == -2){
+            // save probabilities
+            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 
-				// calculate size from specified bytes of packet
-				int calculated_size = (*(check + property.getStart_byte() - 1)) * 256 + (*(check + property.getEnd_byte() - 1)) + 14; 
-				int structure_size = packet_header->len;
-				
-				if (calculated_size == structure_size)
-					protocol.increaseProbability (property.getProbability_change());
-			}
-             
-			// for now we just check one byte and also two bytes of size
-            if (property.getStart_byte() == property.getEnd_byte())
-  				if (property.getConstraint() == *(check + property.getStart_byte() - 1))
-                    protocol.increaseProbability (property.getProbability_change());
-
+        }else if (strcmp(protocol.getLayer() , "application") == 0){
+			applicationLayerflag = true;
         }
-		
-		// save protocol with more probability between tcp or udp, (considered that we always check tcp first)
-		int tcp_probability = 0;
-		if ((strcmp(protocol.getName() , "tcp") == 0) && (protocol.getProbability() >= 50)){
-			tcp_probability = protocol.getProbability();
-			tcpORudp = 1;
-
-		}else if ((strcmp(protocol.getName() , "udp") == 0) && (protocol.getProbability() >= 50))
-			if (protocol.getProbability() > tcp_probability)
-				tcpORudp = 2;
-
-        // increase number pf packet
-        if ((strcmp(protocol.getName() , "ipv4") == 0) && (protocol.getProbability() >= 50))
-            ipv4_number ++;
-        if ((strcmp(protocol.getName() , "ipv6") == 0) && (protocol.getProbability() >= 50))
-            ipv6_number ++;
-
-        // save all probabilities
-        sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
     }
-    logger.log(probabilitiesBuffer, "info");
 
-
-    // print important data of packet
+    Session* newSession;
+    // get important data of packet
     int size = packet_header->len;
     if (tcpORudp == 1){
-        Session newSession = Processing_tcp_packet(packet_body , size);
         tcp_number ++;
-        processing_session(newSession);
+        Session session = Processing_tcp_packet(packet_body , size);
+        processing_session(session);
+        newSession = &session; 
 
     }else if (tcpORudp == 2){
-        Session newSession = Processing_udp_packet(packet_body , size);
         udp_number ++;
-        processing_session(newSession);
+        Session session = Processing_udp_packet(packet_body , size);
+        processing_session(session);
+        newSession = &session; 
     }
 
 
-    // debug
+    // check application layer protocol
+    if (applicationLayerflag)
+        for (Protocol protocol : protocols)
+            if (strcmp(protocol.getLayer() , "application") == 0){
+                
+                //check darsad ehtemal dns 
+                const u_char *check;
+                check = packet_body + 42;
+
+                // check protocol properties
+                check_properties(protocol, check, packet_header);
+
+                if (protocol.getProbability() > 50){
+                    // check all previous saved session to find the same and change its type to new protocol in application layer
+                    for (Session& session : sessions)
+                        if (session.checkSession(*newSession)){
+                            session.setType(protocol.getName());
+                            continue;
+                        }
+                }else{
+                    for (Session session : sessions)
+                        if (session.checkSession(*newSession)){
+                            if (protocol.getName() == (*newSession).getType())
+                                protocol.increaseProbability(0);
+                            // else
+                            //     protocol.increaseProbability(-50);
+                        }
+                }
+                
+                // save probabilities
+                sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+            }
+
+
+    // log probabilities
+    logger.log(probabilitiesBuffer, "info");
+    newSession->logInfo(logger);
+    
+
+    //debug
     sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));
     logger.log(logBuffer, "debug");
 

@@ -1,3 +1,5 @@
+#include "Logger.h"
+
 #include <string>
 #include <string.h>
 
@@ -47,7 +49,7 @@ public:
     // int getNumbers();
 
     // setter
-    // void setType(string typ);
+    void setType(string typ);
     // void setSrcIP(string src);
     // void setDstIP(string dst);
     // void setSrcPort(string src);
@@ -56,7 +58,7 @@ public:
     void increaseNumbers();
     bool checkSession(Session newSession);
 
-    void printInfo();
+    void logInfo(Logger logger);
 };
 
 

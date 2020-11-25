@@ -1,13 +1,13 @@
 {
 	"json_device" : 1,
 	"json_number" : 10,
-	"json_time" : 10,
-	"json_log" : "info",
-	"protocol_list" : [ "tcp", "udp", "ipv6" ],
-	"protocol_tcp" : "config/tcp.json",
+	"json_time" : 5,
+	"json_log" : "trace",
+	"protocol_list" : [ "udp", "dns"],
+	"protocol_tcp" : "disable",
 	"protocol_udp" : "config/udp.json",
 	"protocol_ipv4" : "disable",
-	"protocol_ipv6" : "config/ipv6.json",
-	"protocol_dns" : "disable",
+	"protocol_ipv6" : "disable",
+	"protocol_dns" : "config/dns.json",
 	"protocol_http" : "disable"
 }

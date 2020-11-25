@@ -1,4 +1,5 @@
 #include "Session.h"
+#include "Logger.h"
 
 #include <iostream>
 #include <string>
@@ -67,9 +68,9 @@ string Session::getDstPort(){
 //     return numbers;
 // }
 
-// void Session::setType(string typ){
-//     type = typ;
-// }
+void Session::setType(string typ){
+    type = typ;
+}
 
 // void Session::setSrcIP(string src){
 //     srcIP = src;
@@ -110,8 +111,15 @@ bool Session::checkSession(Session newSession){
 }
 
 
-void Session::printInfo(){
+void Session::logInfo(Logger logger){
 
-cout << type << srcIP << dstIP << scrPort << dstIP << "\n";
+    //printf("%s", type);
+    char logBuffer [256];
+    // sprintf(logBuffer, "Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", type.c_str(), srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str());
+    // logger.log(logBuffer, "info");
+    sprintf(logBuffer, "Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str());	
+    logger.log(logBuffer, "info");
+
+    //cout << type << srcIP << dstIP << scrPort << dstIP << "\n";
 
 }
