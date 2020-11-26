@@ -57,6 +57,7 @@ public:
     // void setStatus(string st);
     void increaseNumbers();
     bool checkSession(Session newSession);
+    bool check4(Session newSession);
 
     void logInfo(Logger logger);
 };

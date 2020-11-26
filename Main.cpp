@@ -60,6 +60,7 @@ int tcp_number = 0;
 int udp_number = 0;
 int ipv4_number = 0;
 int ipv6_number = 0;
+int dns_number = 0;
 
 
 // an struct to hold source and destination of a packet 
@@ -67,16 +68,6 @@ struct IP {
 
 	char src [16];
 	char dst [16];
-};
-
-// a five tuple to hold important data of session
-struct fiveTuple {
-
-    string type;
-    string srcIP;
-    string dstIP;
-    char * scrPort;
-    char * dstPort;
 };
 
 
@@ -220,7 +211,7 @@ void processing_session(Session newSession){
     // check all previous saved session to find the same
     bool newSessionFlag = true;
     for (Session session : sessions)
-        if (session.checkSession(newSession)){
+        if (session.check4(newSession)){
             session.increaseNumbers();
             newSessionFlag = false;
             continue;
@@ -289,6 +280,9 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     // a flag to show if we have application layer protocol or not 
     bool applicationLayerflag = false;
 
+    // 
+    const u_char *startCheckBit;
+
     //check each protocol
     for (Protocol protocol : protocols) {
 
@@ -296,13 +290,12 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         sprintf(logBuffer, "check packet structure with %s protocol", protocol.getName());
         logger.log(logBuffer, "trace");
 
-        const u_char *check;
 
 		if (strcmp(protocol.getLayer() , "internet") == 0){
-        	check = packet_body;
+        	startCheckBit = packet_body;
 
             // check protocol properties
-            check_properties(protocol, check, packet_header);
+            check_properties(protocol, startCheckBit, packet_header);
 
             //debug
             sprintf(logBuffer, "layer = %s, name = %s, prob = %d\n", protocol.getLayer(), protocol.getName(), protocol.getProbability());
@@ -318,10 +311,10 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
             sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 		
         }else if (strcmp(protocol.getLayer() , "transport") == 0){
-            check = ip_header;
+            startCheckBit = ip_header;
 
             // check protocol properties
-            check_properties(protocol, check, packet_header);
+            check_properties(protocol, startCheckBit, packet_header);
 
             //debug
             sprintf(logBuffer, "layer = %s, name = %s, prob = %d\n", protocol.getLayer(), protocol.getName(), protocol.getProbability());
@@ -345,61 +338,139 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         }
     }
 
-    Session* newSession;
+    //Session* newSession = NULL;
     // get important data of packet
     int size = packet_header->len;
     if (tcpORudp == 1){
         tcp_number ++;
         Session session = Processing_tcp_packet(packet_body , size);
         processing_session(session);
-        newSession = &session; 
+        //newSession = &session; 
+
+        const u_char * buf = packet_body;              
+        struct iphdr *iph = (struct iphdr *)( buf  + sizeof(struct ethhdr) );
+        unsigned short iphdrlen = iph->ihl*4;
+        struct tcphdr *tcph=(struct tcphdr*)(buf + iphdrlen + sizeof(struct ethhdr));
+        int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
+        startCheckBit = packet_body + header_size;
+        
+
+    // char logBuffer [256];
+    // sprintf(logBuffer, "1) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
+    // logger.log(logBuffer, "info");
+
+        // log probabilities
+        // logger.log(probabilitiesBuffer, "info");
+        // session.logInfo(logger);
 
     }else if (tcpORudp == 2){
         udp_number ++;
-        Session session = Processing_udp_packet(packet_body , size);
-        processing_session(session);
-        newSession = &session; 
+        Session tmpSession = Processing_udp_packet(packet_body , size);
+        processing_session(tmpSession);
+        //newSession = &session;
+
+        const u_char * buf = packet_body;              
+        struct iphdr *iph = (struct iphdr *)(buf + sizeof(struct ethhdr));
+        unsigned short iphdrlen = iph->ihl*4;
+        struct udphdr *udph = (struct udphdr*)(buf + iphdrlen  + sizeof(struct ethhdr));
+        int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
+        startCheckBit = packet_body + header_size;
+
+        // char logBuffer [256];
+        // sprintf(logBuffer, "1) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
+        // logger.log(logBuffer, "info");
+        
+        
+        // check application layer protocol
+        if (applicationLayerflag)
+            for (Protocol protocol : protocols)
+                if (strcmp(protocol.getLayer() , "application") == 0){
+
+                    if(startCheckBit < packet_body + size - 10){
+                                        
+                        // check protocol properties
+                        check_properties(protocol, startCheckBit, packet_header);
+
+                        if (protocol.getProbability() > 75){
+                            // check all previous saved session to find the same and change its type to new protocol in application layer
+                            for (Session& session : sessions){
+                                if (session.check4(tmpSession)){
+                                    session.setType(protocol.getName());
+                                    tmpSession.setType(protocol.getName());
+                                    continue;
+                                }
+                            }
+                        
+                        }else{
+
+                            for (Session session : sessions)
+
+                                if (session.check4(tmpSession))
+                                    if (session.getType() == protocol.getName()){
+                                        tmpSession.setType(session.getType());
+                                        protocol.increaseProbability(10);
+                                    }
+                        }
+                    }
+                    // save probabilities
+                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+                    
+                    if((strcmp(protocol.getName() , "dns") == 0) && (protocol.getProbability() >= 60))
+                        dns_number ++;
+                }
+
+
+        // log probabilities
+        logger.log(probabilitiesBuffer, "info");
+        tmpSession.logInfo(logger);
+        
+    
     }
 
-
-    // check application layer protocol
-    if (applicationLayerflag)
-        for (Protocol protocol : protocols)
-            if (strcmp(protocol.getLayer() , "application") == 0){
-                
-                //check darsad ehtemal dns 
-                const u_char *check;
-                check = packet_body + 42;
-
-                // check protocol properties
-                check_properties(protocol, check, packet_header);
-
-                if (protocol.getProbability() > 50){
-                    // check all previous saved session to find the same and change its type to new protocol in application layer
-                    for (Session& session : sessions)
-                        if (session.checkSession(*newSession)){
-                            session.setType(protocol.getName());
-                            continue;
-                        }
-                }else{
-                    for (Session session : sessions)
-                        if (session.checkSession(*newSession)){
-                            if (protocol.getName() == (*newSession).getType())
-                                protocol.increaseProbability(0);
-                            // else
-                            //     protocol.increaseProbability(-50);
-                        }
-                }
-                
-                // save probabilities
-                sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
-            }
+    // char logBuffer [256];
+    // sprintf(logBuffer, "2) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
+    // logger.log(logBuffer, "info");
 
 
-    // log probabilities
-    logger.log(probabilitiesBuffer, "info");
-    newSession->logInfo(logger);
-    
+    // // check application layer protocol
+    // if (applicationLayerflag)
+    //     for (Protocol protocol : protocols)
+    //         if (strcmp(protocol.getLayer() , "application") == 0){
+
+    //             if(startCheckBit < packet_body + size - 10){
+
+    //                 // check protocol properties
+    //                 check_properties(protocol, startCheckBit, packet_header);
+
+    //                 if (protocol.getProbability() > 70){
+    //                     // check all previous saved session to find the same and change its type to new protocol in application layer
+    //                     for (Session& session : sessions)
+    //                         if (session.checkSession(*newSession)){
+    //                             printf("%s - ", session.getType().c_str());
+    //                             printf("%s - ", protocol.getName());
+    //                             session.setType(protocol.getName());
+    //                             printf("%s\n", session.getType().c_str());
+    //                             continue;
+    //                         }
+    //                 }else{
+    //                     for (Session session : sessions)
+    //                         if (session.checkSession(*newSession)){
+    //                             if (protocol.getName() == (*newSession).getType())
+    //                                 protocol.increaseProbability(0);
+    //                             // else
+    //                             //     protocol.increaseProbability(-50);
+    //                         }
+    //                 }
+    //             }
+    //             // save probabilities
+    //             sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+    //         }
+
+
+    // // log probabilities
+    // logger.log(probabilitiesBuffer, "info");
+    // newSession->logInfo(logger);
+
 
     //debug
     sprintf(logBuffer, "proto %d\t %d", *(packet_body + 12), *(packet_body + 13));
@@ -607,7 +678,7 @@ void sig_handler(int signum){
     char buffer[256];
     sprintf(buffer, "Statistics of last %d seconds: packets: %d - sessions: %lu", capture_time, packet_number, sessions.size());
     logger.log(buffer, "info");
-    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d", tcp_number, udp_number, ipv4_number, ipv6_number), 
+    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d,   |    dns: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number), 
     logger.log(buffer, "info");
 
 	packet_number = 0;
@@ -615,6 +686,7 @@ void sig_handler(int signum){
 	udp_number = 0;
 	ipv4_number = 0;
 	ipv6_number = 0;
+    dns_number = 0;
 
     sessions.clear();
 

@@ -100,26 +100,28 @@ bool Session::checkSession(Session newSession){
 		
     if (type == newSession.getType()){
 
-        if ((srcIP == newSession.getSrcIP()) && (dstIP == newSession.getDstIP()) && (scrPort == newSession.getSrcPort()) && (dstPort == newSession.getDstPort()))
-            return true;
-
-        if ((srcIP == newSession.getDstIP()) && (dstIP == newSession.getSrcIP()) && (scrPort == newSession.getDstPort()) && (dstPort == newSession.getSrcPort()))
+        if (this->check4(newSession))
             return true;
 
     }else
         return false;    
 }
 
+bool Session::check4(Session newSession){
+
+    if ((srcIP == newSession.getSrcIP()) && (dstIP == newSession.getDstIP()) && (scrPort == newSession.getSrcPort()) && (dstPort == newSession.getDstPort()))
+        return true;
+
+    if ((srcIP == newSession.getDstIP()) && (dstIP == newSession.getSrcIP()) && (scrPort == newSession.getDstPort()) && (dstPort == newSession.getSrcPort()))
+        return true;
+
+    return false;    
+}
+
 
 void Session::logInfo(Logger logger){
 
-    //printf("%s", type);
     char logBuffer [256];
-    // sprintf(logBuffer, "Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", type.c_str(), srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str());
-    // logger.log(logBuffer, "info");
-    sprintf(logBuffer, "Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str());	
+    sprintf(logBuffer, "Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", type.c_str(), srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str());
     logger.log(logBuffer, "info");
-
-    //cout << type << srcIP << dstIP << scrPort << dstIP << "\n";
-
 }
