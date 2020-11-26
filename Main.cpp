@@ -61,6 +61,7 @@ int udp_number = 0;
 int ipv4_number = 0;
 int ipv6_number = 0;
 int dns_number = 0;
+int http_number = 0;
 
 
 // an struct to hold source and destination of a packet 
@@ -127,31 +128,15 @@ Session Processing_tcp_packet(const u_char * Buffer, int Size) {
     // trace
     logger.log("packet considered as tcp", "trace");
 
-    unsigned short iphdrlen;
-	
+    
 	struct iphdr *iph = (struct iphdr *)( Buffer  + sizeof(struct ethhdr) );
-	iphdrlen = iph->ihl*4;
+	unsigned short iphdrlen = iph->ihl*4;
 	
 	struct tcphdr *tcph=(struct tcphdr*)(Buffer + iphdrlen + sizeof(struct ethhdr));
-			
-	//int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
-
-    // get printable part of payload
-    //char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
-
-    // print useful data of tcp header
-    // char logBuffer [256];
-    // sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(tcph->source), ntohs(tcph->dest));	
-    // logger.log(logBuffer, "info");
-
-
-    //sprintf(logBuffer, "    payload: %s", printable_payload);
-	//logger.log(logBuffer, "info");
-
 
     // use two buffer to convert from uint16 to string
     char buf1 [10];
@@ -169,31 +154,14 @@ Session Processing_udp_packet(const u_char * Buffer, int Size){
     // trace
     logger.log("packet considered as udp", "trace");
 
-	unsigned short iphdrlen;
-	
-	struct iphdr *iph = (struct iphdr *)(Buffer +  sizeof(struct ethhdr));
-	iphdrlen = iph->ihl*4;
-	
-	struct udphdr *udph = (struct udphdr*)(Buffer + iphdrlen  + sizeof(struct ethhdr));
-	
-	//int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
 
-	// get printable part of payload
-	//char *printable_payload = find_printable_payload(Buffer + header_size, Size - header_size);
+	struct iphdr *iph = (struct iphdr *)(Buffer +  sizeof(struct ethhdr));
+	unsigned short iphdrlen = iph->ihl*4;
+	struct udphdr *udph = (struct udphdr*)(Buffer + iphdrlen  + sizeof(struct ethhdr));
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
-
-    // print useful data of udp header
-    // char logBuffer [256];
-    // sprintf(logBuffer, "Size: %4d bytes  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5d  |  Dst port: %5d", Size, ip.src, ip.dst, ntohs(udph->source), ntohs(udph->dest));
-	// logger.log(logBuffer, "info");
-
-
-    //sprintf(logBuffer, "    payload: %s", printable_payload);
-	//logger.log(logBuffer, "info");
-
 
     // use two buffer to convert from uint16 to string
     char buf1 [10];
@@ -265,10 +233,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     //start of IP header
     ip_header = packet_body + ethernet_header_length;
 
-    // logger.log(" ", "info");
-    // sprintf(logBuffer, "     number: %d", ++packet_number);
-    // logger.log(logBuffer, "info");
-
 
     // make an string to print probability of each protocol
     char probabilitiesBuffer [256] = "#";
@@ -279,8 +243,7 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 	int tcpORudp = 0;	
     // a flag to show if we have application layer protocol or not 
     bool applicationLayerflag = false;
-
-    // 
+    // a pointer to first part that we want to check. it differ in protocols depend on their layer.
     const u_char *startCheckBit;
 
     //check each protocol
@@ -291,6 +254,7 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         logger.log(logBuffer, "trace");
 
 
+        // check protocols of internet layer
 		if (strcmp(protocol.getLayer() , "internet") == 0){
         	startCheckBit = packet_body;
 
@@ -306,10 +270,11 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                 ipv4_number ++;
             if ((strcmp(protocol.getName() , "ipv6") == 0) && (protocol.getProbability() >= 50))
                 ipv6_number ++;
-		
+    
             // save probabilities
             sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 		
+        // check protocols of transport layer
         }else if (strcmp(protocol.getLayer() , "transport") == 0){
             startCheckBit = ip_header;
 
@@ -319,7 +284,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
             //debug
             sprintf(logBuffer, "layer = %s, name = %s, prob = %d\n", protocol.getLayer(), protocol.getName(), protocol.getProbability());
             logger.log(logBuffer, "debug");
-
 
             // save protocol with more probability between tcp or udp, (considered that we always check tcp first)
             int tcp_probability = 0;
@@ -333,6 +297,7 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
             // save probabilities
             sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 
+        // application layer check later
         }else if (strcmp(protocol.getLayer() , "application") == 0){
 			applicationLayerflag = true;
         }
@@ -343,8 +308,8 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     int size = packet_header->len;
     if (tcpORudp == 1){
         tcp_number ++;
-        Session session = Processing_tcp_packet(packet_body , size);
-        processing_session(session);
+        Session tmpSession = Processing_tcp_packet(packet_body , size);
+        processing_session(tmpSession);
         //newSession = &session; 
 
         const u_char * buf = packet_body;              
@@ -353,15 +318,72 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         struct tcphdr *tcph=(struct tcphdr*)(buf + iphdrlen + sizeof(struct ethhdr));
         int header_size =  sizeof(struct ethhdr) + iphdrlen + tcph->doff*4;
         startCheckBit = packet_body + header_size;
-        
 
-    // char logBuffer [256];
-    // sprintf(logBuffer, "1) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
-    // logger.log(logBuffer, "info");
+
+        // check application layer protocol
+        if (applicationLayerflag)
+            for (Protocol protocol : protocols)
+                //if (strcmp(protocol.getLayer() , "application") == 0){
+                // for now we just check http packets
+                if (strcmp(protocol.getName() , "http") == 0){
+
+                    if (size > header_size){
+                        // get printable part of payload
+                        char *printable_payload = find_printable_payload(packet_body + header_size, size - header_size);
+
+                        //printf("%s\n", printable_payload);
+
+                        if (strstr(printable_payload, "HTTP") != NULL)
+                            protocol.increaseProbability(10);
+                        if (strstr(printable_payload, "Host:") != NULL)
+                            protocol.increaseProbability(10);
+                        if (strstr(printable_payload, "User-Agent:") != NULL)
+                            protocol.increaseProbability(10);                            
+                        if (strstr(printable_payload, "Accept-Encoding:") != NULL)
+                            protocol.increaseProbability(10);  
+                        if (strstr(printable_payload, "Accept:") != NULL)
+                            protocol.increaseProbability(10);  
+                        if (strstr(printable_payload, "Connection:") != NULL)
+                            protocol.increaseProbability(10);  
+
+                    }
+
+                    // check protocol properties
+                    //check_properties(protocol, startCheckBit, packet_header);
+
+                    if (protocol.getProbability() >= 50){
+                        // check all previous saved session to find the same and change its type to new protocol in application layer
+                        for (Session& session : sessions){
+                            if (session.check4(tmpSession)){
+                                session.setType(protocol.getName());
+                                tmpSession.setType(protocol.getName());
+                                continue;
+                            }
+                        }
+                    
+                    }else{
+
+                        for (Session session : sessions)
+
+                            if (session.check4(tmpSession))
+                                if (session.getType() == protocol.getName()){
+                                    tmpSession.setType(session.getType());
+                                    // protocol.increaseProbability(10);
+                                }
+                    }
+                    
+                    // save probabilities
+                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+                    
+                    if((strcmp(protocol.getName() , "http") == 0) && ((protocol.getProbability() >= 50) || (tmpSession.getType() == "http")))
+                        http_number ++;
+                }
+
 
         // log probabilities
-        // logger.log(probabilitiesBuffer, "info");
-        // session.logInfo(logger);
+        logger.log(probabilitiesBuffer, "info");
+        tmpSession.logInfo(logger);
+
 
     }else if (tcpORudp == 2){
         udp_number ++;
@@ -375,12 +397,8 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         struct udphdr *udph = (struct udphdr*)(buf + iphdrlen  + sizeof(struct ethhdr));
         int header_size =  sizeof(struct ethhdr) + iphdrlen + sizeof udph;
         startCheckBit = packet_body + header_size;
-
-        // char logBuffer [256];
-        // sprintf(logBuffer, "1) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
-        // logger.log(logBuffer, "info");
         
-        
+             
         // check application layer protocol
         if (applicationLayerflag)
             for (Protocol protocol : protocols)
@@ -421,10 +439,9 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 
         // log probabilities
-        logger.log(probabilitiesBuffer, "info");
-        tmpSession.logInfo(logger);
-        
-    
+        // logger.log(probabilitiesBuffer, "info");
+        // tmpSession.logInfo(logger);
+
     }
 
     // char logBuffer [256];
@@ -678,7 +695,7 @@ void sig_handler(int signum){
     char buffer[256];
     sprintf(buffer, "Statistics of last %d seconds: packets: %d - sessions: %lu", capture_time, packet_number, sessions.size());
     logger.log(buffer, "info");
-    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d,   |    dns: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number), 
+    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d   |    dns: %3d   |   http: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number, http_number), 
     logger.log(buffer, "info");
 
 	packet_number = 0;
@@ -687,6 +704,7 @@ void sig_handler(int signum){
 	ipv4_number = 0;
 	ipv6_number = 0;
     dns_number = 0;
+    http_number = 0;
 
     sessions.clear();
 

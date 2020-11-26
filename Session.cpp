@@ -98,13 +98,11 @@ void Session::increaseNumbers(){
 
 bool Session::checkSession(Session newSession){
 		
-    if (type == newSession.getType()){
-
+    if (type == newSession.getType())
         if (this->check4(newSession))
             return true;
 
-    }else
-        return false;    
+    return false;    
 }
 
 bool Session::check4(Session newSession){

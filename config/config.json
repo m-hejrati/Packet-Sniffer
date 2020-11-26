@@ -2,12 +2,12 @@
 	"json_device" : 1,
 	"json_number" : 10,
 	"json_time" : 5,
-	"json_log" : "trace",
-	"protocol_list" : [ "udp", "dns"],
-	"protocol_tcp" : "disable",
+	"json_log" : "info",
+	"protocol_list" : [ "tcp", "udp", "dns", "http"],
+	"protocol_tcp" : "config/tcp.json",
 	"protocol_udp" : "config/udp.json",
 	"protocol_ipv4" : "disable",
 	"protocol_ipv6" : "disable",
 	"protocol_dns" : "config/dns.json",
-	"protocol_http" : "disable"
+	"protocol_http" : "config/http.json"
 }
