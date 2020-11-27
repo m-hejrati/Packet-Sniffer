@@ -131,13 +131,11 @@ Session Processing_tcp_packet(const u_char * Buffer, int Size) {
     
 	struct iphdr *iph = (struct iphdr *)( Buffer  + sizeof(struct ethhdr) );
 	unsigned short iphdrlen = iph->ihl*4;
-	
 	struct tcphdr *tcph=(struct tcphdr*)(Buffer + iphdrlen + sizeof(struct ethhdr));
 
 	// get ip from function
 	struct IP ip = Processing_ip_header(Buffer, Size);
 	
-
     // use two buffer to convert from uint16 to string
     char buf1 [10];
     sprintf(buf1, "%d", ntohs(tcph->source));
@@ -160,8 +158,7 @@ Session Processing_udp_packet(const u_char * Buffer, int Size){
 	struct udphdr *udph = (struct udphdr*)(Buffer + iphdrlen  + sizeof(struct ethhdr));
 
 	// get ip from function
-	struct IP ip = Processing_ip_header(Buffer, Size);
-	
+	struct IP ip = Processing_ip_header(Buffer, Size);	
 
     // use two buffer to convert from uint16 to string
     char buf1 [10];
@@ -174,13 +171,14 @@ Session Processing_udp_packet(const u_char * Buffer, int Size){
 
 
 // save sessions 
-void processing_session(Session newSession){
+void processing_session(Session& newSession){
 
     // check all previous saved session to find the same
     bool newSessionFlag = true;
-    for (Session session : sessions)
+    for (Session& session : sessions) // use & for calling by reference
         if (session.check4(newSession)){
-            session.increaseNumbers();
+            newSession.increaseNumbers(session.getNumbers()); // chon newSession ro jadid sakhtim, pas # yarohash yeke. pas # ghabliaro aezafe mikonom behesh
+            session.increaseNumbers(1);
             newSessionFlag = false;
             continue;
         }
@@ -303,15 +301,20 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         }
     }
 
-    //Session* newSession = NULL;
+
+    // Session* newSession = NULL;
     // get important data of packet
     int size = packet_header->len;
     if (tcpORudp == 1){
+
         tcp_number ++;
+        // get 5 main part of packet and save them in an object of session class
         Session tmpSession = Processing_tcp_packet(packet_body , size);
         processing_session(tmpSession);
         //newSession = &session; 
 
+
+        // find first byte of payload in tcp packet
         const u_char * buf = packet_body;              
         struct iphdr *iph = (struct iphdr *)( buf  + sizeof(struct ethhdr) );
         unsigned short iphdrlen = iph->ihl*4;
@@ -323,17 +326,22 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         // check application layer protocol
         if (applicationLayerflag)
             for (Protocol protocol : protocols)
-                //if (strcmp(protocol.getLayer() , "application") == 0){
+                // if (strcmp(protocol.getLayer() , "application") == 0){
                 // for now we just check http packets
                 if (strcmp(protocol.getName() , "http") == 0){
-
+                    
+                    // if it has payload ...
                     if (size > header_size){
+
                         // get printable part of payload
                         char *printable_payload = find_printable_payload(packet_body + header_size, size - header_size);
 
                         //printf("%s\n", printable_payload);
 
-                        if (strstr(printable_payload, "HTTP") != NULL)
+                        // check protocol properties
+                        // it should be configable later
+                        //check_properties(protocol, startCheckBit, packet_header);
+                        if (strstr(printable_payload, "HTTP/") != NULL)
                             protocol.increaseProbability(10);
                         if (strstr(printable_payload, "Host:") != NULL)
                             protocol.increaseProbability(10);
@@ -345,14 +353,12 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                             protocol.increaseProbability(10);  
                         if (strstr(printable_payload, "Connection:") != NULL)
                             protocol.increaseProbability(10);  
-
+                        if (strstr(printable_payload, "GET") != NULL)
+                            protocol.increaseProbability(10);  
                     }
 
-                    // check protocol properties
-                    //check_properties(protocol, startCheckBit, packet_header);
-
                     if (protocol.getProbability() >= 50){
-                        // check all previous saved session to find the same and change its type to new protocol in application layer
+                        // check all previous saved session to find the same and update its type to new protocol in application layer
                         for (Session& session : sessions){
                             if (session.check4(tmpSession)){
                                 session.setType(protocol.getName());
@@ -362,16 +368,13 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                         }
                     
                     }else{
-
+                        // set the packet protocol to its session packet
                         for (Session session : sessions)
-
                             if (session.check4(tmpSession))
-                                if (session.getType() == protocol.getName()){
+                                if (session.getType() == protocol.getName())
                                     tmpSession.setType(session.getType());
-                                    // protocol.increaseProbability(10);
-                                }
                     }
-                    
+
                     // save probabilities
                     sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
                     
@@ -386,11 +389,15 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 
     }else if (tcpORudp == 2){
+
         udp_number ++;
+        // get 5 main part of packet and save them in an object of session class
         Session tmpSession = Processing_udp_packet(packet_body , size);
         processing_session(tmpSession);
         //newSession = &session;
 
+
+        // find first byte of payload in udp packet
         const u_char * buf = packet_body;              
         struct iphdr *iph = (struct iphdr *)(buf + sizeof(struct ethhdr));
         unsigned short iphdrlen = iph->ihl*4;
@@ -402,9 +409,12 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
         // check application layer protocol
         if (applicationLayerflag)
             for (Protocol protocol : protocols)
-                if (strcmp(protocol.getLayer() , "application") == 0){
+                // if (strcmp(protocol.getLayer() , "application") == 0){
+                // for now we just check dns packets
+                if (strcmp(protocol.getName() , "dns") == 0){
 
-                    if(startCheckBit < packet_body + size - 10){
+                    // if it has payload ...
+                    if(startCheckBit < packet_body + size - 10){ // 10 faghat baraye etminane bishtare
                                         
                         // check protocol properties
                         check_properties(protocol, startCheckBit, packet_header);
@@ -420,9 +430,8 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                             }
                         
                         }else{
-
+                        // set the packet protocol to its session packet
                             for (Session session : sessions)
-
                                 if (session.check4(tmpSession))
                                     if (session.getType() == protocol.getName()){
                                         tmpSession.setType(session.getType());
@@ -439,15 +448,16 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
 
 
         // log probabilities
-        // logger.log(probabilitiesBuffer, "info");
-        // tmpSession.logInfo(logger);
-
+        logger.log(probabilitiesBuffer, "info");
+        tmpSession.logInfo(logger);
     }
+
+
+    //////inaa kheili ajibe, ye dastoor log toye if bala va bironesh 2 ta chiz mokhtalef chaap mikard. majboor shodim be taghir.
 
     // char logBuffer [256];
     // sprintf(logBuffer, "2) Protocol: %s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s", newSession->getType().c_str(), newSession->getSrcIP().c_str(), newSession->getDstIP().c_str(), newSession->getSrcPort().c_str(), newSession->getDstPort().c_str());
     // logger.log(logBuffer, "info");
-
 
     // // check application layer protocol
     // if (applicationLayerflag)
@@ -482,7 +492,6 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
     //             // save probabilities
     //             sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
     //         }
-
 
     // // log probabilities
     // logger.log(probabilitiesBuffer, "info");
@@ -705,6 +714,9 @@ void sig_handler(int signum){
 	ipv6_number = 0;
     dns_number = 0;
     http_number = 0;
+
+    for(Session session : sessions)
+        session.logInfo(logger);
 
     sessions.clear();
 

@@ -6,17 +6,6 @@
 using namespace std; 
 
 
-// // a five tuple to hold important data of session
-// struct fiveTuple {
-
-//     string type;
-//     string srcIP;
-//     string dstIP;
-//     char * scrPort;
-//     char * dstPort;
-// };
-
-
 #ifndef TEST_PEOTOCOL_H
 #define TEST_PROTOCOL_H
 
@@ -45,21 +34,23 @@ public:
     string getDstIP();
     string getSrcPort();
     string getDstPort();
-    // string getStatus();
-    // int getNumbers();
+    int getNumbers();
 
     // setter
     void setType(string typ);
-    // void setSrcIP(string src);
-    // void setDstIP(string dst);
-    // void setSrcPort(string src);
-    // void setDstPort(string dst);
-    // void setStatus(string st);
-    void increaseNumbers();
-    bool checkSession(Session newSession);
-    bool check4(Session newSession);
 
+    // increase number of packet in this session
+    void increaseNumbers(int a);
+    
+    // check if two packets are in the same session or not by checking five tuples
+    bool checkSession(Session newSession);
+    
+    // check source and destenation of port and IP
+    bool check4(Session newSession);
+    
+    // save information of this packet
     void logInfo(Logger logger);
+
 };
 
 
