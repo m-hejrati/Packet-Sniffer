@@ -339,22 +339,49 @@ void packet_handler(u_char *args, const struct pcap_pkthdr *packet_header, const
                         //printf("%s\n", printable_payload);
 
                         // check protocol properties
-                        // it should be configable later
                         //check_properties(protocol, startCheckBit, packet_header);
-                        if (strstr(printable_payload, "HTTP/") != NULL)
-                            protocol.increaseProbability(10);
-                        if (strstr(printable_payload, "Host:") != NULL)
-                            protocol.increaseProbability(10);
-                        if (strstr(printable_payload, "User-Agent:") != NULL)
-                            protocol.increaseProbability(10);                            
-                        if (strstr(printable_payload, "Accept-Encoding:") != NULL)
-                            protocol.increaseProbability(10);  
-                        if (strstr(printable_payload, "Accept:") != NULL)
-                            protocol.increaseProbability(10);  
-                        if (strstr(printable_payload, "Connection:") != NULL)
-                            protocol.increaseProbability(10);  
-                        if (strstr(printable_payload, "GET") != NULL)
-                            protocol.increaseProbability(10);  
+                        // it should put in protocol class later
+                        char buffer[512] = "";
+                        FILE *fp;
+                        fp = fopen("config/http.json", "r");
+                        if (fp == NULL){
+                            logger.log("Error in opening config file", "error");
+                            return;
+                        }
+                        fread(buffer, 512, 1, fp);
+                        fclose(fp);
+
+                        json_object *jobj = json_tokener_parse(buffer);
+                        enum json_type type;
+
+                        json_object_object_foreach(jobj, key, val) {
+
+                            type = json_object_get_type(val);
+                            if (type == json_type_array) {
+
+                                // "headers" reserved for possible headers
+                                string keylid = key;
+                                if (keylid == "headers"){
+
+                                    json_object *jarray;
+                                    jarray = json_object_object_get(jobj, key);
+
+                                    int arraylen = json_object_array_length(jarray);
+                                    json_object * jvalue;
+
+                                    // get all headers and check if there is in http packet or not
+                                    for (int i = 0; i < arraylen; i++){
+
+                                        jvalue = json_object_array_get_idx(jarray, i);
+                                        type = json_object_get_type(jvalue);
+                                        string head = json_object_get_string(jvalue);
+
+                                         if (strstr(printable_payload, head.c_str()) != NULL)
+                                            protocol.increaseProbability(10);                                          
+                                    }
+                                }
+                            }
+                        }                   
                     }
 
                     if (protocol.getProbability() >= 50){
@@ -580,18 +607,23 @@ void json_parse_config (json_object * jobj) {
 		            type = json_object_get_type(val);
 		            if (type == json_type_array) {
 
-		                Property prop;
+                        // "headers" reserved for possible headers.
+                        string keylid = key;
+                        if (keylid != "headers"){
 
-		                json_object *jarray;
-		                jarray = json_object_object_get(jobj, key);
+                            Property prop;
 
-		                prop.setStart_byte (json_object_get_int( json_object_array_get_idx(jarray, 0)));
-		                prop.setEnd_byte (json_object_get_int( json_object_array_get_idx(jarray, 1)));
-		                prop.setConstraint (json_object_get_int( json_object_array_get_idx(jarray, 2)));
-		                prop.setProbability_change (json_object_get_int( json_object_array_get_idx(jarray, 3)));
+                            json_object *jarray;
+                            jarray = json_object_object_get(jobj, key);
 
-		                // add each property to property list of protocol
-                        prot.addProperty(prop);
+                            prop.setStart_byte (json_object_get_int( json_object_array_get_idx(jarray, 0)));
+                            prop.setEnd_byte (json_object_get_int( json_object_array_get_idx(jarray, 1)));
+                            prop.setConstraint (json_object_get_int( json_object_array_get_idx(jarray, 2)));
+                            prop.setProbability_change (json_object_get_int( json_object_array_get_idx(jarray, 3)));
+
+                            // add each property to property list of protocol
+                            prot.addProperty(prop);
+                        }
 
 		            }else{
 		                //if (key == "layer")
@@ -717,6 +749,7 @@ void sig_handler(int signum){
 
     for(Session session : sessions)
         session.logInfo(logger);
+    logger.log(buffer, "");
 
     sessions.clear();
 

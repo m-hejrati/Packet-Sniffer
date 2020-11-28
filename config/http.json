@@ -1,3 +1,4 @@
 {
 	"layer" : "application",
+	"headers" : [ "HTTP/", "GET", "PUT", "POST", "Host:", "User-Agent:", "Accept-Encoding:", "Accept:", "Connection:" ]
 }
