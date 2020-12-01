@@ -18,11 +18,19 @@ string Logger::getConfigType() {
     return configType;
 }
 
+
 // constructor of Logger class
 Logger::Logger(string typ){
     configType = typ;
     spdlog::enable_backtrace(8192);
 }
+
+//default constructor
+Logger::Logger(){
+    configType = "info";
+    spdlog::enable_backtrace(8192);
+}
+
 
 // get message and log with choose level
 // log all the message with the same and also higher priority than what saved in config file

@@ -6,8 +6,8 @@
 using namespace std; 
 
 
-#ifndef TEST_PEOTOCOL_H
-#define TEST_PROTOCOL_H
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
 
 
 // class protocol holds information of each protocol

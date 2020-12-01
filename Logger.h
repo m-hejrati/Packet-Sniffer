@@ -24,6 +24,8 @@ public:
 
     // constructor of Logger class
     Logger(string typ);
+    // default constructor
+    Logger();
 
     // get message and log with choose level
     // and log if selected level in config file is the same as log
