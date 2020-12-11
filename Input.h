@@ -1,5 +1,5 @@
-#include "Protocol.h"
-#include "Logger.h"
+#include "../Engine/Protocol.h"
+#include "../Engine/Logger.h"
 
 #include <json-c/json.h>
 

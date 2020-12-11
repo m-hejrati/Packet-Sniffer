@@ -1,7 +1,7 @@
 // include dependent classes
-#include "Engine.h"
-#include "Input.h"
-#include "Logger.h"
+#include "Engine/Engine.h"
+#include "Input/Input.h"
+#include "Engine/Logger.h"
 
 
 #include <locale>
