@@ -1,13 +1,14 @@
 {
 	"json_device" : 1,
 	"json_number" : 10,
-	"json_time" : 5,
+	"json_time" : 15,
 	"json_log" : "info",
-	"protocol_list" : [ "tcp", "udp", "ipv4", "ipv6", "dns", "http"],
+	"protocol_list" : [ "tcp", "udp", "ipv4", "ipv6", "dns", "http", "https"],
 	"protocol_tcp" : "config/tcp.json",
 	"protocol_udp" : "config/udp.json",
 	"protocol_ipv4" : "config/ipv4.json",
 	"protocol_ipv6" : "config/ipv6.json",
 	"protocol_dns" : "config/dns.json",
-	"protocol_http" : "config/http.json"
+	"protocol_http" : "config/http.json",
+	"protocol_https" : "config/https.json"
 }

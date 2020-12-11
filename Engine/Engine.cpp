@@ -34,6 +34,7 @@ int ipv4_number = 0;
 int ipv6_number = 0;
 int dns_number = 0;
 int http_number = 0;
+int https_number = 0;
 
 Logger logger2;
 
@@ -60,7 +61,7 @@ void Engine::showStatistics(int capture_time){
     char buffer[256];
     sprintf(buffer, "Statistics of last %d seconds: packets: %d - sessions: %lu", capture_time, packet_number, sessions.size());
     logger2.log(buffer, "info");
-    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d   |    dns: %3d   |   http: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number, http_number), 
+    sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d   |    dns: %3d   |   http: %3d   |   https: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number, http_number, https_number), 
     logger2.log(buffer, "info");
 
 	packet_number = 0;
@@ -70,6 +71,7 @@ void Engine::showStatistics(int capture_time){
 	ipv6_number = 0;
     dns_number = 0;
     http_number = 0;
+    https_number = 0;
 
     for(Session session : sessions)
         session.logInfo(logger2);
@@ -281,7 +283,7 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                 ipv6_number ++;
     
             // save probabilities
-            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%5s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 		
         // check protocols of transport layer
         }else if (strcmp(protocol.getLayer() , "transport") == 0){
@@ -304,7 +306,7 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                     tcpORudp = 2;
 
             // save probabilities
-            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+            sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%5s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
 
         // application layer check later
         }else if (strcmp(protocol.getLayer() , "application") == 0){
@@ -337,85 +339,80 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
         // check application layer protocol
         if (applicationLayerflag)
             for (Protocol protocol : protocols)
-                // if (strcmp(protocol.getLayer() , "application") == 0){
-                // for now we just check http packets
-                if (strcmp(protocol.getName() , "http") == 0){
-                    
-                    // if it has payload ...
-                    if (size > header_size){
+                if (strcmp(protocol.getLayer() , "application") == 0){
 
-                        // get printable part of payload
-                        char *printable_payload = find_printable_payload(packet_body + header_size, size - header_size);
+                    // http is detected in different method than others...
+                    if (strcmp(protocol.getName() , "http") == 0){
+                        
+                        // if it has payload ...
+                        if (size > header_size){
 
-                        //printf("%s\n", printable_payload);
+                            // get printable part of payload
+                            char *printable_payload = find_printable_payload(packet_body + header_size, size - header_size);
 
-                        // check protocol properties
-                        //check_properties(protocol, startCheckBit, packet_header);
-                        // it should put in protocol class later
-                        char buffer[512] = "";
-                        FILE *fp;
-                        fp = fopen("config/http.json", "r");
-                        if (fp == NULL){
-                            logger2.log("Error in opening config file", "error");
-                            return;
-                        }
-                        fread(buffer, 512, 1, fp);
-                        fclose(fp);
+                            //printf("%s\n", printable_payload);
 
-                        json_object *jobj = json_tokener_parse(buffer);
-                        enum json_type type;
+                            // check protocol properties
+                            //check_properties(protocol, startCheckBit, packet_header);
+                            // it should put in protocol class later
+                            char buffer[512] = "";
+                            FILE *fp;
+                            fp = fopen("config/http.json", "r");
+                            if (fp == NULL){
+                                logger2.log("Error in opening config file", "error");
+                                return;
+                            }
+                            fread(buffer, 512, 1, fp);
+                            fclose(fp);
 
-                        json_object_object_foreach(jobj, key, val) {
+                            json_object *jobj = json_tokener_parse(buffer);
+                            enum json_type type;
 
-                            type = json_object_get_type(val);
-                            if (type == json_type_array) {
+                            json_object_object_foreach(jobj, key, val) {
 
-                                // "headers" reserved for possible headers
-                                string keylid = key;
-                                if (keylid == "headers"){
+                                type = json_object_get_type(val);
+                                if (type == json_type_array) {
 
-                                    json_object *jarray;
-                                    jarray = json_object_object_get(jobj, key);
+                                    // "headers" reserved for possible headers
+                                    string keylid = key;
+                                    if (keylid == "headers"){
 
-                                    int arraylen = json_object_array_length(jarray);
-                                    json_object * jvalue;
+                                        json_object *jarray;
+                                        jarray = json_object_object_get(jobj, key);
 
-                                    // get all headers and check if there is in http packet or not
-                                    for (int i = 0; i < arraylen; i++){
+                                        int arraylen = json_object_array_length(jarray);
+                                        json_object * jvalue;
 
-                                        jvalue = json_object_array_get_idx(jarray, i);
-                                        type = json_object_get_type(jvalue);
-                                        string head = json_object_get_string(jvalue);
+                                        // get all headers and check if there is in http packet or not
+                                        for (int i = 0; i < arraylen; i++){
 
-                                         if (strstr(printable_payload, head.c_str()) != NULL)
-                                            protocol.increaseProbability(10);                                          
+                                            jvalue = json_object_array_get_idx(jarray, i);
+                                            type = json_object_get_type(jvalue);
+                                            string head = json_object_get_string(jvalue);
+
+                                            if (strstr(printable_payload, head.c_str()) != NULL)
+                                                protocol.increaseProbability(10);                                          
+                                        }
                                     }
                                 }
-                            }
-                        }                   
+                            }                   
+                        }
+
+                    }else if (strcmp(protocol.getName() , "https") == 0){
+                        
+                        // check protocol properties
+                        check_properties(protocol, startCheckBit, packet_header);
                     }
 
-                    if (protocol.getProbability() >= 50){
-                        // check all previous saved session to find the same and update its type to new protocol in application layer
-                        for (Session& session : sessions){
-                            if (session.check4(tmpSession)){
-                                session.setType(protocol.getName());
-                                tmpSession.setType(protocol.getName());
-                                continue;
-                            }
-                        }
-                    
-                    }else{
-                        // set the packet protocol to its session packet
-                        for (Session session : sessions)
-                            if (session.check4(tmpSession))
-                                if (session.getType() == protocol.getName())
-                                    tmpSession.setType(session.getType());
-                    }
+                    // update protocol
+                    updateApplicationProtocol(protocol, tmpSession);
 
                     // save probabilities
-                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%5s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
                     
+                    if((strcmp(protocol.getName() , "https") == 0) && ((protocol.getProbability() >= 50) || (tmpSession.getType() == "https")))
+                        https_number ++;
+
                     if((strcmp(protocol.getName() , "http") == 0) && ((protocol.getProbability() >= 50) || (tmpSession.getType() == "http")))
                         http_number ++;
                 }
@@ -457,33 +454,17 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                         // check protocol properties
                         check_properties(protocol, startCheckBit, packet_header);
 
-                        if (protocol.getProbability() > 75){
-                            // check all previous saved session to find the same and change its type to new protocol in application layer
-                            for (Session& session : sessions){
-                                if (session.check4(tmpSession)){
-                                    session.setType(protocol.getName());
-                                    tmpSession.setType(protocol.getName());
-                                    continue;
-                                }
-                            }
-                        
-                        }else{
-                        // set the packet protocol to its session packet
-                            for (Session session : sessions)
-                                if (session.check4(tmpSession))
-                                    if (session.getType() == protocol.getName()){
-                                        tmpSession.setType(session.getType());
-                                        protocol.increaseProbability(10);
-                                    }
-                        }
+                        // update protocol
+                        updateApplicationProtocol(protocol, tmpSession);
                     }
-                    // save probabilities
-                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%4s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
-                    
-                    if((strcmp(protocol.getName() , "dns") == 0) && (protocol.getProbability() >= 60))
-                        dns_number ++;
-                }
 
+                    // save probabilities
+                    sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%5s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
+                    
+                    if((strcmp(protocol.getName() , "dns") == 0) && ((protocol.getProbability() >= 50) || (tmpSession.getType() == "dns")))
+                        dns_number ++;
+                
+                }
 
         // log probabilities
         logger2.log(probabilitiesBuffer, "info");
@@ -504,4 +485,27 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
     //debug
     sprintf(logBuffer2, "byte_size: %d \t %d ", *(ip_header + 2), *(ip_header + 3));
     logger2.log(logBuffer2, "debug");
+}
+
+
+// update session name if there is the same one before, or set protocol name to its session (in yaroo asl amaliat marboot be application layer e, etelaat bishtar dar gozaresh)
+void Engine::updateApplicationProtocol(Protocol& protocol, Session& tmpSession){
+
+    if (protocol.getProbability() >= 50){
+        // check all previous saved session to find the same and update its type to new protocol in application layer
+        for (Session& session : sessions){
+            if (session.check4(tmpSession)){
+                session.setType(protocol.getName());
+                tmpSession.setType(protocol.getName());
+                continue;
+            }
+        }
+
+    }else{
+        // set the packet protocol to its session packet
+        for (Session session : sessions)
+            if (session.check4(tmpSession))
+                if (session.getType() == protocol.getName())
+                    tmpSession.setType(session.getType());
+    }
 }

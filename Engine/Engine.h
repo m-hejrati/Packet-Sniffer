@@ -34,6 +34,7 @@ private:
     int ipv6_number = 0;
     int dns_number = 0;
     int http_number = 0;
+    int https_number = 0;
 
     Logger logger;
 
@@ -73,6 +74,8 @@ public:
     // run the engine
     void Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_char *packet_body, vector <Protocol> protocols);
 
+    // update session name if there is the same one before, or set protocol name to its session (in yaroo asl amaliat marboot be application layer e, etelaat bishtar dar gozaresh)
+    void updateApplicationProtocol(Protocol& protocol, Session& tmpSession);
 
 };
 
