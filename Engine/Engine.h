@@ -77,6 +77,8 @@ public:
     // update session name if there is the same one before, or set protocol name to its session (in yaroo asl amaliat marboot be application layer e, etelaat bishtar dar gozaresh)
     void updateApplicationProtocol(Protocol& protocol, Session& tmpSession);
 
+    // find server name in client hello message
+    void findSNI(const u_char *check, int len);
 };
 
 

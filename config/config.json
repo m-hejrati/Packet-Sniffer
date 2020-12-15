@@ -1,8 +1,8 @@
 {
 	"json_device" : 1,
 	"json_number" : 10,
-	"json_time" : 15,
-	"json_log" : "info",
+	"json_time" : 7,
+	"json_log" : "critical",
 	"protocol_list" : [ "tcp", "udp", "ipv4", "ipv6", "dns", "http", "https"],
 	"protocol_tcp" : "config/tcp.json",
 	"protocol_udp" : "config/udp.json",

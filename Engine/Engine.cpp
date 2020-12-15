@@ -348,7 +348,7 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                         if (size > header_size){
 
                             // get printable part of payload
-                            char *printable_payload = find_printable_payload(packet_body + header_size, size - header_size);
+                            char *printable_payload = find_printable_payload(startCheckBit, size - header_size);
 
                             //printf("%s\n", printable_payload);
 
@@ -402,6 +402,11 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                         
                         // check protocol properties
                         check_properties(protocol, startCheckBit, packet_header);
+
+                        // find sni & print server name (felan) if it is tls handshake
+                        if (protocol.getProbability() >= 50)
+                            findSNI(startCheckBit, size - header_size);
+
                     }
 
                     // update protocol
@@ -508,4 +513,29 @@ void Engine::updateApplicationProtocol(Protocol& protocol, Session& tmpSession){
                 if (session.getType() == protocol.getName())
                     tmpSession.setType(session.getType());
     }
+}
+
+
+// find server name in client hello message
+void Engine::findSNI(const u_char *check, int len){
+
+    // find and save length of all variable parameter
+    // to finally detect server name
+
+    int sessionIDLength = * (check + 43);
+
+    int startCipherSuitesLength = *(check + sessionIDLength + 44);
+    int endCipherSuitesLength = *(check + sessionIDLength + 45);
+    int CipherSuitesLength = 256 * startCipherSuitesLength + endCipherSuitesLength;
+
+    int startServerNameLength = *(check + sessionIDLength + CipherSuitesLength + 57);
+    int endServerNameLength = *(check + sessionIDLength + CipherSuitesLength + 58);
+    int serverNameLength = 256 * startServerNameLength + endServerNameLength;
+
+    // pointer to first byte of server name
+    const u_char *startServerName = check + 59 + sessionIDLength + CipherSuitesLength;
+
+    for(int i = 0 ; i < serverNameLength; i++)
+        printf("%c", *(startServerName + i));
+    printf("\n");
 }
