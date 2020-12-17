@@ -12,7 +12,6 @@ char layer [15];
 int probability = 0; // percentage probability of this protocol 
 vector <Property> properties;
 
-
 char * Protocol::getName(){
     return name;
 }
@@ -29,6 +28,7 @@ vector <Property> Protocol::getProperties(){
     return properties;
 }
 
+
 void Protocol::setName(char n []){
     sprintf(name, "%s", n);
 }
@@ -36,6 +36,7 @@ void Protocol::setName(char n []){
 void Protocol::setLayer(const char l []){
     sprintf(layer, "%s", l);
 }
+
 
 void Protocol::increaseProbability(int prob){
     probability += prob;

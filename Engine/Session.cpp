@@ -15,6 +15,7 @@ string scrPort;
 string dstPort;
 string status;
 int numbers;
+string serverName;
 
 
 // constructor of Logger class
@@ -27,6 +28,7 @@ Session::Session(string typ, string sIP, string dIP, string sPort, string dPort)
     dstPort = dPort;
     status = "open";
     numbers = 1;
+    serverName = "";
 }
 
 //getter
@@ -55,11 +57,19 @@ int Session::getNumbers(){
     return numbers;
 }
 
+string Session::getServerName(){
+    return serverName;
+}
+
 
 //setter
 
 void Session::setType(string typ){
     type = typ;
+}
+
+void Session::setServerName(string server){
+    serverName = server;
 }
 
 
@@ -97,6 +107,6 @@ bool Session::check4(Session newSession){
 void Session::logInfo(Logger logger){
 
     char logBuffer [256];
-    sprintf(logBuffer, "Protocol: %4s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s  |  #%02d", type.c_str(), srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str(), numbers);
+    sprintf(logBuffer, "Protocol: %5s  |  Src IP: %15s  |  Dst IP: %15s  |  Src port: %5s  |  Dst port: %5s  |  #%02d", type.c_str(), srcIP.c_str(), dstIP.c_str(), scrPort.c_str(), dstPort.c_str(), numbers);
     logger.log(logBuffer, "info");
 }

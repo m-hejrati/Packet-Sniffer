@@ -35,6 +35,7 @@ int ipv6_number = 0;
 int dns_number = 0;
 int http_number = 0;
 int https_number = 0;
+unsigned int total_size = 0;
 
 Logger logger2;
 
@@ -45,6 +46,7 @@ struct IP {
     char dst [16];
 }ip;
 
+char serverNameGlobal [64];
 
 // constructor of Engine class
 Engine::Engine(string logType) {
@@ -59,6 +61,15 @@ void Engine::showStatistics(int capture_time){
     // this part should rewrite whenever new protocol add to program
     logger2.log(" ", "info");
     char buffer[256];
+
+    if (total_size < 1000) 
+        sprintf(buffer, "Total size of the packet passing through aparat = %.2f B", total_size);
+    else if (total_size >= 1000 && total_size < 1000000)
+        sprintf(buffer, "Total size of the packet passing through aparat = %.2f KB", total_size / 1024.0);
+    else if (total_size >= 1000000)
+        sprintf(buffer, "Total size of the packet passing through aparat = %.2f MB", total_size / 1048576.0);
+    logger2.log(buffer, "info");
+
     sprintf(buffer, "Statistics of last %d seconds: packets: %d - sessions: %lu", capture_time, packet_number, sessions.size());
     logger2.log(buffer, "info");
     sprintf(buffer, " tcp: %3d   |    udp: %3d   |   ipv4: %3d   |   ipv6: %3d   |    dns: %3d   |   http: %3d   |   https: %3d", tcp_number, udp_number, ipv4_number, ipv6_number, dns_number, http_number, https_number), 
@@ -72,7 +83,8 @@ void Engine::showStatistics(int capture_time){
     dns_number = 0;
     http_number = 0;
     https_number = 0;
-
+    total_size = 0;
+    
     for(Session session : sessions)
         session.logInfo(logger2);
     logger2.log(" ", "info");
@@ -403,14 +415,18 @@ void Engine::Run(u_char *args, const struct pcap_pkthdr *packet_header, const u_
                         // check protocol properties
                         check_properties(protocol, startCheckBit, packet_header);
 
-                        // find sni & print server name (felan) if it is tls handshake
+                        // find sni and save it to global variable if it is tls handshake (mikhastam too protocol save konam vali nashod)
                         if (protocol.getProbability() >= 50)
-                            findSNI(startCheckBit, size - header_size);
-
+                            strcpy(serverNameGlobal, findSNI(startCheckBit, size - header_size));
                     }
 
                     // update protocol
                     updateApplicationProtocol(protocol, tmpSession);
+
+                    // if this packet related to aparat.com
+                    if(tmpSession.getServerName().find(".aparat.com") != std::string::npos){
+                        total_size += size;
+                    }
 
                     // save probabilities
                     sprintf (probabilitiesBuffer + strlen(probabilitiesBuffer),"%5s: %%%02d  |  ", protocol.getName(), protocol.getProbability());
@@ -502,22 +518,33 @@ void Engine::updateApplicationProtocol(Protocol& protocol, Session& tmpSession){
             if (session.check4(tmpSession)){
                 session.setType(protocol.getName());
                 tmpSession.setType(protocol.getName());
+
+                // save server name 
+                if (strcmp(protocol.getName() , "https") == 0){
+                    session.setServerName(serverNameGlobal);
+                    tmpSession.setServerName(serverNameGlobal);
+                }
+
                 continue;
             }
         }
+
 
     }else{
         // set the packet protocol to its session packet
         for (Session session : sessions)
             if (session.check4(tmpSession))
-                if (session.getType() == protocol.getName())
+                if (session.getType() == protocol.getName()){
                     tmpSession.setType(session.getType());
+                    // save server name 
+                    tmpSession.setServerName(session.getServerName());
+                }
     }
 }
 
 
 // find server name in client hello message
-void Engine::findSNI(const u_char *check, int len){
+char * Engine::findSNI(const u_char *check, int len){
 
     // find and save length of all variable parameter
     // to finally detect server name
@@ -535,7 +562,11 @@ void Engine::findSNI(const u_char *check, int len){
     // pointer to first byte of server name
     const u_char *startServerName = check + 59 + sessionIDLength + CipherSuitesLength;
 
+    // save server name and return it from function
+    char serverName [64]{};
     for(int i = 0 ; i < serverNameLength; i++)
-        printf("%c", *(startServerName + i));
-    printf("\n");
+        sprintf(serverName + strlen(serverName), "%c", *(startServerName + i));
+   
+    char * tmp = serverName;
+    return tmp;
 }

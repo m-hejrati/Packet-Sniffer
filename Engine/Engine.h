@@ -78,7 +78,7 @@ public:
     void updateApplicationProtocol(Protocol& protocol, Session& tmpSession);
 
     // find server name in client hello message
-    void findSNI(const u_char *check, int len);
+    char* findSNI(const u_char *check, int len);
 };
 
 

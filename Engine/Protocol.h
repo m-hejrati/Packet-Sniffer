@@ -20,6 +20,7 @@ private:
     int probability = 0; // percentage probability of this protocol 
     vector <Property> properties;
 
+
 public:
     
     // getter

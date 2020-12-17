@@ -22,6 +22,7 @@ private:
     string dstPort;
     string status;
     int numbers;
+    string serverName;
 
 
 public:
@@ -35,9 +36,11 @@ public:
     string getSrcPort();
     string getDstPort();
     int getNumbers();
+    string getServerName();
 
     // setter
     void setType(string typ);
+    void setServerName(string server);
 
     // increase number of packet in this session
     void increaseNumbers(int a);
